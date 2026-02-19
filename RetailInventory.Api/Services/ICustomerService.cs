@@ -1,7 +1,11 @@
-﻿namespace RetailInventory.Api.Services
+﻿using RetailInventory.Api.DTOs;
+
+namespace RetailInventory.Api.Services
 {
     public interface ICustomerService
     {
         Task<int> ImportFromExternalAsync();
+        Task<List<CustomerDto>> GetAllAsync();
+        Task<CustomerDto?> GetByIdAsync(Guid id);
     }
 }

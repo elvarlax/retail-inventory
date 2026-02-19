@@ -9,9 +9,7 @@ namespace RetailInventory.Api.Services
         private readonly IDummyJsonService _dummyService;
         private readonly IProductRepository _repository;
 
-        public ProductService(
-            IDummyJsonService dummyService,
-            IProductRepository repository)
+        public ProductService(IDummyJsonService dummyService, IProductRepository repository)
         {
             _dummyService = dummyService;
             _repository = repository;

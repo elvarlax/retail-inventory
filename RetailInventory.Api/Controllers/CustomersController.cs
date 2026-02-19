@@ -20,5 +20,23 @@ namespace RetailInventory.Api.Controllers
             var count = await _customerService.ImportFromExternalAsync();
             return Ok(new { ImportedCount = count });
         }
+
+        [HttpGet]
+        public async Task<IActionResult> GetAllCustomers()
+        {
+            var customers = await _customerService.GetAllAsync();
+            return Ok(customers);
+        }
+
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetById(Guid id)
+        {
+            var customer = await _customerService.GetByIdAsync(id);
+
+            if (customer == null)
+                return NotFound();
+
+            return Ok(customer);
+        }
     }
 }

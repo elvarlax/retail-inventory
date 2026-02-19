@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using RetailInventory.Api.Data;
+using RetailInventory.Api.Models;
 
 namespace RetailInventory.Api.Repositories
 {
@@ -17,7 +18,17 @@ namespace RetailInventory.Api.Repositories
             return await _dbContext.Customers.AnyAsync(c => c.ExternalId == externalId);
         }
 
-        public async Task AddAsync(Models.Customer customer)
+        public async Task<List<Customer>> GetAllAsync()
+        {
+            return await _dbContext.Customers.AsNoTracking().ToListAsync();
+        }
+
+        public async Task<Customer?> GetByIdAsync(Guid id)
+        {
+            return await _dbContext.Customers.AsNoTracking().FirstOrDefaultAsync(c => c.Id == id);
+        }
+
+        public async Task AddAsync(Customer customer)
         {
             await _dbContext.Customers.AddAsync(customer);
         }

@@ -13,9 +13,14 @@ namespace RetailInventory.Api.Repositories
             _dbContext = dbContext;
         }
 
+        public async Task<bool> ExistsByExternalIdAsync(int externalId)
+        {
+            return await _dbContext.Products.AnyAsync(p => p.ExternalId == externalId);
+        }
+
         public async Task<List<Product>> GetAllAsync()
         {
-            return await _dbContext.Products.ToListAsync();
+            return await _dbContext.Products.AsNoTracking().ToListAsync();
         }
 
         public async Task<Product?> GetByIdAsync(Guid id)
@@ -26,11 +31,6 @@ namespace RetailInventory.Api.Repositories
         public async Task AddAsync(Product product)
         {
             await _dbContext.Products.AddAsync(product);
-        }
-
-        public async Task<bool> ExistsByExternalIdAsync(int externalId)
-        {
-            return await _dbContext.Products.AnyAsync(p => p.ExternalId == externalId);
         }
 
         public async Task SaveChangesAsync()

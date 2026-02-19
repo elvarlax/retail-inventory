@@ -22,7 +22,7 @@ namespace RetailInventory.Api.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAllProducts()
         {
             var products = await _productService.GetAllAsync();
             return Ok(products);
@@ -38,6 +38,5 @@ namespace RetailInventory.Api.Controllers
 
             return Ok(product);
         }
-
     }
 }
