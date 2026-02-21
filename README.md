@@ -1,11 +1,12 @@
 # Retail Inventory API
 
-A RESTful API built with **ASP.NET Core (.NET 10)** and **PostgreSQL**
-for managing retail inventory.
+Retail Inventory API is a backend-focused project built with ASP.NET
+Core (.NET 10) and PostgreSQL.\
+It demonstrates layered architecture, transactional domain logic,
+pagination, aggregation queries, and structured test coverage.
 
-This project demonstrates clean layered architecture, external API
-ingestion, DTO separation, environment-based configuration, and database
-integrity constraints.
+The goal of this project is to reflect real-world backend engineering
+practices rather than simple CRUD scaffolding.
 
 ------------------------------------------------------------------------
 
@@ -13,39 +14,122 @@ integrity constraints.
 
 Controller → Service → Repository → DbContext → PostgreSQL
 
--   Controllers handle HTTP requests\
--   Services contain business logic\
--   Repositories abstract data access\
--   EF Core manages persistence\
--   PostgreSQL stores data
+-   Controllers handle HTTP requests and responses
+-   Services encapsulate business rules and domain logic
+-   Repositories abstract data access
+-   Entity Framework Core manages persistence
+-   PostgreSQL is used for development and production
+-   SQLite (in-memory) is used for testing
+
+This separation keeps business logic independent from infrastructure
+concerns and makes the application easier to test and evolve.
 
 ------------------------------------------------------------------------
 
-## Implemented Features
+## Domain Features
 
-### Product Ingestion
+### Products
 
--   Imports all products from DummyJSON (`/products`)
--   Handles pagination dynamically
+-   Import products from DummyJSON (`/products`)
 -   Unique constraints on `ExternalId` and `SKU`
 -   Endpoints:
     -   `GET /api/products`
     -   `GET /api/products/{id}`
     -   `POST /api/products/import`
 
-### Customer Ingestion
+### Customers
 
--   Imports all users from DummyJSON (`/users`)
--   Paginated import logic
+-   Import users from DummyJSON (`/users`)
 -   Unique constraints on `ExternalId` and `Email`
--   Endpoint:
+-   Endpoints:
+    -   `GET /api/customers`
+    -   `GET /api/customers/{id}`
     -   `POST /api/customers/import`
 
-### Configuration
+### Orders
 
--   `appsettings.json` contains non-sensitive defaults
--   `appsettings.Development.json` stores local secrets (ignored by Git)
--   Environment-based configuration loading
+The order aggregate contains the core business logic of the system.
+
+Implemented behavior includes:
+
+-   Transactional order creation
+-   Stock deduction during order creation
+-   Stock restoration when cancelling an order
+-   Controlled state transitions (Pending → Completed / Cancelled)
+-   Revenue aggregation via summary endpoint
+-   Paginated and filtered order retrieval
+-   AutoMapper-based projection to DTOs
+
+Endpoints:
+
+-   `POST /api/orders`
+-   `GET /api/orders/{id}`
+-   `PUT /api/orders/{id}/complete`
+-   `PUT /api/orders/{id}/cancel`
+-   `GET /api/orders`
+-   `GET /api/orders/summary`
+
+------------------------------------------------------------------------
+
+## Pagination & Filtering
+
+Orders support:
+
+-   `pageNumber`
+-   `pageSize` (with enforced upper bound)
+-   `status` filter (Pending, Completed, Cancelled)
+
+Example:
+
+    GET /api/orders?pageNumber=1&pageSize=10&status=Completed
+
+Pagination is implemented using `Skip`/`Take` with total count
+calculation to simulate production-ready API behavior.
+
+------------------------------------------------------------------------
+
+## Transaction Handling
+
+Order creation is wrapped in a database transaction to ensure:
+
+-   Stock updates and order creation are atomic
+-   Partial writes are prevented
+-   Business invariants are preserved
+
+------------------------------------------------------------------------
+
+## Testing Strategy
+
+### Unit Tests
+
+-   SQLite in-memory relational provider
+-   Validation of business rules
+-   Verification of stock mutation
+-   Enforcement of state transitions
+-   Tests for failure scenarios (invalid customer, insufficient stock,
+    etc.)
+
+### Integration Tests
+
+-   WebApplicationFactory
+-   Full HTTP pipeline execution
+-   Environment-based database override (Testing → SQLite)
+-   Real routing, middleware, and serialization validation
+
+This setup ensures both domain logic correctness and application
+boundary correctness.
+
+------------------------------------------------------------------------
+
+## AutoMapper
+
+AutoMapper is used for:
+
+-   Entity → DTO projection
+-   Order and OrderItem mapping
+-   Separation between persistence models and API contracts
+
+Mapping profiles are centrally defined and injected via DI.
 
 ------------------------------------------------------------------------
 
@@ -55,29 +139,19 @@ Controller → Service → Repository → DbContext → PostgreSQL
 -   ASP.NET Core Web API
 -   Entity Framework Core
 -   PostgreSQL (Npgsql)
+-   SQLite (Testing)
+-   AutoMapper
+-   xUnit
+-   FluentAssertions
 -   Swagger
--   Layered Architecture Pattern
 
 ------------------------------------------------------------------------
 
-## Database Schema
+## Configuration
 
-### Products
-
--   Id (Guid)
--   ExternalId (unique)
--   Name
--   SKU (unique)
--   StockQuantity
--   Price
-
-### Customers
-
--   Id (Guid)
--   ExternalId (unique)
--   FirstName
--   LastName
--   Email (unique)
+-   `appsettings.json` -- base configuration
+-   `appsettings.Development.json` -- local secrets (ignored by Git)
+-   `Testing` environment switches provider from PostgreSQL to SQLite
 
 ------------------------------------------------------------------------
 
@@ -90,35 +164,38 @@ Controller → Service → Repository → DbContext → PostgreSQL
 
 ### Setup
 
-1.  Clone the repository
-
+1.  Clone repository
 2.  Create `appsettings.Development.json` inside `RetailInventory.Api`
-
 3.  Apply migrations:
 
-        dotnet ef database update
+```{=html}
+<!-- -->
+```
+    dotnet ef database update
 
-4.  Run the application:
+4.  Run application:
 
-        dotnet run
+```{=html}
+<!-- -->
+```
+    dotnet run
 
-5.  Open Swagger at:
+5.  Open Swagger:
 
-        https://localhost:7182/swagger/index.html
+```{=html}
+<!-- -->
+```
+    https://localhost:7182/swagger/index.html
 
 ------------------------------------------------------------------------
 
-## Next Steps
+## Project Focus
 
--   Implement Order aggregate with transaction handling
--   Add stock validation
--   Introduce AutoMapper
--   Add validation middleware
+This project is designed to demonstrate:
 
-------------------------------------------------------------------------
-
-## Purpose
-
-This project is designed as a portfolio-grade backend system
-demonstrating practical backend engineering patterns and clean
-architecture principles.
+-   Clean layered architecture
+-   Transactional consistency
+-   Business rule enforcement
+-   Pagination and aggregation
+-   Structured testing (unit + integration)
+-   Environment-aware infrastructure configuration

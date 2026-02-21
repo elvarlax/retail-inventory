@@ -1,4 +1,4 @@
-﻿using RetailInventory.Api.Models;
+﻿namespace RetailInventory.Api.Models;
 
 public class DummyJsonUserResponse
 {
