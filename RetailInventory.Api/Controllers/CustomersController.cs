@@ -1,42 +1,41 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using RetailInventory.Api.Services;
 
-namespace RetailInventory.Api.Controllers
+namespace RetailInventory.Api.Controllers;
+
+[ApiController]
+[Route("api/[controller]")]
+public class CustomersController : ControllerBase
 {
-    [ApiController]
-    [Route("api/[controller]")]
-    public class CustomersController : ControllerBase
+    private readonly ICustomerService _customerService;
+
+    public CustomersController(ICustomerService customerService)
     {
-        private readonly ICustomerService _customerService;
+        _customerService = customerService;
+    }
 
-        public CustomersController(ICustomerService customerService)
-        {
-            _customerService = customerService;
-        }
+    [HttpPost("import")]
+    public async Task<IActionResult> ImportCustomers()
+    {
+        var count = await _customerService.ImportFromExternalAsync();
+        return Ok(new { ImportedCount = count });
+    }
 
-        [HttpPost("import")]
-        public async Task<IActionResult> ImportCustomers()
-        {
-            var count = await _customerService.ImportFromExternalAsync();
-            return Ok(new { ImportedCount = count });
-        }
+    [HttpGet]
+    public async Task<IActionResult> GetAllCustomers()
+    {
+        var customers = await _customerService.GetAllAsync();
+        return Ok(customers);
+    }
 
-        [HttpGet]
-        public async Task<IActionResult> GetAllCustomers()
-        {
-            var customers = await _customerService.GetAllAsync();
-            return Ok(customers);
-        }
+    [HttpGet("{id}")]
+    public async Task<IActionResult> GetById(Guid id)
+    {
+        var customer = await _customerService.GetByIdAsync(id);
 
-        [HttpGet("{id}")]
-        public async Task<IActionResult> GetById(Guid id)
-        {
-            var customer = await _customerService.GetByIdAsync(id);
+        if (customer == null)
+            return NotFound();
 
-            if (customer == null)
-                return NotFound();
-
-            return Ok(customer);
-        }
+        return Ok(customer);
     }
 }

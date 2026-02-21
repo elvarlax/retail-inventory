@@ -1,9 +1,11 @@
 # Retail Inventory API
 
-Retail Inventory API is a backend-focused project built with ASP.NET
-Core (.NET 10) and PostgreSQL.\
+Retail Inventory API is a backend-focused project built with **ASP.NET
+Core (.NET 10)** and **PostgreSQL**.
+
 It demonstrates layered architecture, transactional domain logic,
-pagination, aggregation queries, and structured test coverage.
+pagination, aggregation queries, repository abstraction, and structured
+test coverage.
 
 The goal of this project is to reflect real-world backend engineering
 practices rather than simple CRUD scaffolding.
@@ -14,11 +16,11 @@ practices rather than simple CRUD scaffolding.
 
 Controller → Service → Repository → DbContext → PostgreSQL
 
--   Controllers handle HTTP requests and responses
--   Services encapsulate business rules and domain logic
--   Repositories abstract data access
--   Entity Framework Core manages persistence
--   PostgreSQL is used for development and production
+-   Controllers handle HTTP requests and responses\
+-   Services encapsulate business rules and domain logic\
+-   Repositories abstract data access and query logic\
+-   Entity Framework Core manages persistence\
+-   PostgreSQL is used for development and production\
 -   SQLite (in-memory) is used for testing
 
 This separation keeps business logic independent from infrastructure
@@ -37,6 +39,8 @@ concerns and makes the application easier to test and evolve.
     -   `GET /api/products/{id}`
     -   `POST /api/products/import`
 
+------------------------------------------------------------------------
+
 ### Customers
 
 -   Import users from DummyJSON (`/users`)
@@ -45,6 +49,8 @@ concerns and makes the application easier to test and evolve.
     -   `GET /api/customers`
     -   `GET /api/customers/{id}`
     -   `POST /api/customers/import`
+
+------------------------------------------------------------------------
 
 ### Orders
 
@@ -59,13 +65,14 @@ Implemented behavior includes:
 -   Revenue aggregation via summary endpoint
 -   Paginated and filtered order retrieval
 -   AutoMapper-based projection to DTOs
+-   Repository-based query abstraction
 
 Endpoints:
 
 -   `POST /api/orders`
 -   `GET /api/orders/{id}`
--   `PUT /api/orders/{id}/complete`
--   `PUT /api/orders/{id}/cancel`
+-   `POST /api/orders/{id}/complete`
+-   `POST /api/orders/{id}/cancel`
 -   `GET /api/orders`
 -   `GET /api/orders/summary`
 
@@ -77,11 +84,11 @@ Orders support:
 
 -   `pageNumber`
 -   `pageSize` (with enforced upper bound)
--   `status` filter (Pending, Completed, Cancelled)
+-   `status` filter (`Pending`, `Completed`, `Cancelled`)
 
 Example:
 
-    GET /api/orders?pageNumber=1&pageSize=10&status=Completed
+ `GET /api/orders?pageNumber=1&pageSize=10&status=Completed`
 
 Pagination is implemented using `Skip`/`Take` with total count
 calculation to simulate production-ready API behavior.
@@ -106,14 +113,14 @@ Order creation is wrapped in a database transaction to ensure:
 -   Validation of business rules
 -   Verification of stock mutation
 -   Enforcement of state transitions
--   Tests for failure scenarios (invalid customer, insufficient stock,
-    etc.)
+-   Edge case coverage (invalid customer, insufficient stock, invalid
+    status, empty items)
 
 ### Integration Tests
 
 -   WebApplicationFactory
 -   Full HTTP pipeline execution
--   Environment-based database override (Testing → SQLite)
+-   Environment-based database override (`Testing` → `SQLite`)
 -   Real routing, middleware, and serialization validation
 
 This setup ensures both domain logic correctness and application
@@ -129,29 +136,49 @@ AutoMapper is used for:
 -   Order and OrderItem mapping
 -   Separation between persistence models and API contracts
 
-Mapping profiles are centrally defined and injected via DI.
+Mapping profiles are centrally defined and injected via dependency
+injection.
 
 ------------------------------------------------------------------------
 
 ## Tech Stack
 
--   .NET 10
--   ASP.NET Core Web API
--   Entity Framework Core
--   PostgreSQL (Npgsql)
--   SQLite (Testing)
--   AutoMapper
--   xUnit
--   FluentAssertions
+-   .NET 10\
+-   ASP.NET Core Web API\
+-   Entity Framework Core\
+-   PostgreSQL (Npgsql)\
+-   SQLite (Testing)\
+-   AutoMapper\
+-   xUnit\
+-   FluentAssertions\
 -   Swagger
 
 ------------------------------------------------------------------------
 
 ## Configuration
 
--   `appsettings.json` -- base configuration
--   `appsettings.Development.json` -- local secrets (ignored by Git)
+-   `appsettings.json` --- base configuration\
+-   `appsettings.Development.json` --- local secrets (ignored by Git)\
 -   `Testing` environment switches provider from PostgreSQL to SQLite
+
+------------------------------------------------------------------------
+
+## Project Structure
+
+RetailInventory.Api\
+├── Controllers\
+├── Services\
+├── Repositories\
+├── Data\
+├── DTOs\
+├── Models\
+├── Mappings\
+├── Middleware
+
+RetailInventory.Tests\
+├── Unit\
+├── Integration\
+├── Helpers
 
 ------------------------------------------------------------------------
 
@@ -159,43 +186,38 @@ Mapping profiles are centrally defined and injected via DI.
 
 ### Prerequisites
 
--   .NET 10 SDK
+-   .NET 10 SDK\
 -   PostgreSQL
 
 ### Setup
 
-1.  Clone repository
-2.  Create `appsettings.Development.json` inside `RetailInventory.Api`
+1.  Clone the repository\
+2.  Create `appsettings.Development.json` inside `RetailInventory.Api`\
 3.  Apply migrations:
 
-```{=html}
-<!-- -->
-```
-    dotnet ef database update
+dotnet ef database update
 
 4.  Run application:
 
-```{=html}
-<!-- -->
-```
-    dotnet run
+dotnet run
 
 5.  Open Swagger:
 
-```{=html}
-<!-- -->
-```
-    https://localhost:7182/swagger/index.html
+https://localhost:7182/swagger/index.html
 
 ------------------------------------------------------------------------
 
 ## Project Focus
 
-This project is designed to demonstrate:
+This project intentionally prioritizes architectural clarity and domain
+correctness over rapid scaffolding.
 
--   Clean layered architecture
--   Transactional consistency
--   Business rule enforcement
--   Pagination and aggregation
--   Structured testing (unit + integration)
+It demonstrates:
+
+-   Clean layered architecture\
+-   Transactional consistency\
+-   Business rule enforcement\
+-   Pagination and aggregation\
+-   Repository abstraction\
+-   Structured testing (unit + integration)\
 -   Environment-aware infrastructure configuration
