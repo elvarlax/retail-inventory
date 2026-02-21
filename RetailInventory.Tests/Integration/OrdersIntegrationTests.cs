@@ -1,5 +1,4 @@
 ﻿using FluentAssertions;
-using RetailInventory.Tests.Helpers;
 using System.Net;
 
 namespace RetailInventory.Tests;

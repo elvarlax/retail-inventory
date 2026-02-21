@@ -14,7 +14,7 @@ public class MappingProfile : Profile
         // Customer
         CreateMap<Customer, CustomerDto>();
 
-        // Order items
+        // OrderItems
         CreateMap<OrderItem, OrderItemDto>();
 
         // Orders

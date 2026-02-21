@@ -4,17 +4,20 @@ using RetailInventory.Api.Data;
 using RetailInventory.Api.DTOs;
 using RetailInventory.Api.Models;
 using AutoMapper;
+using RetailInventory.Api.Repositories;
 
 namespace RetailInventory.Api.Services;
 
 public class OrderService : IOrderService
 {
     private readonly RetailDbContext _dbContext;
+    private readonly IOrderRepository _orderRepository;
     private readonly IMapper _mapper;
 
-    public OrderService(RetailDbContext dbContext, IMapper mapper)
+    public OrderService(RetailDbContext dbContext, IOrderRepository orderRepository, IMapper mapper)
     {
         _dbContext = dbContext;
+        _orderRepository = orderRepository;
         _mapper = mapper;
     }
 
@@ -81,9 +84,9 @@ public class OrderService : IOrderService
 
         order.TotalAmount = total;
 
-        await _dbContext.Orders.AddAsync(order);
+        await _orderRepository.AddAsync(order);
 
-        await _dbContext.SaveChangesAsync();
+        await _orderRepository.SaveChangesAsync();
 
         // Commit transaction only after all changes succeed
         await transaction.CommitAsync();
@@ -93,9 +96,7 @@ public class OrderService : IOrderService
 
     public async Task<OrderDto> GetByIdAsync(Guid id)
     {
-        var order = await _dbContext.Orders
-            .Include(o => o.OrderItems)
-            .FirstOrDefaultAsync(o => o.Id == id);
+        var order = await _orderRepository.GetByIdAsync(id);
 
         if (order == null)
             throw new NotFoundException("Order not found.");
@@ -105,8 +106,7 @@ public class OrderService : IOrderService
 
     public async Task CompleteAsync(Guid id)
     {
-        var order = await _dbContext.Orders
-            .FirstOrDefaultAsync(o => o.Id == id);
+        var order = await _orderRepository.GetByIdAsync(id);
 
         if (order == null)
             throw new NotFoundException("Order not found.");
@@ -116,14 +116,12 @@ public class OrderService : IOrderService
 
         order.Status = OrderStatus.Completed;
 
-        await _dbContext.SaveChangesAsync();
+        await _orderRepository.SaveChangesAsync();
     }
 
     public async Task CancelAsync(Guid id)
     {
-        var order = await _dbContext.Orders
-            .Include(o => o.OrderItems)
-            .FirstOrDefaultAsync(o => o.Id == id);
+        var order = await _orderRepository.GetByIdAsync(id);
 
         if (order == null)
             throw new NotFoundException("Order not found.");
@@ -145,19 +143,27 @@ public class OrderService : IOrderService
 
         order.Status = OrderStatus.Cancelled;
 
-        await _dbContext.SaveChangesAsync();
+        await _orderRepository.SaveChangesAsync();
     }
 
     public async Task<OrderSummaryDto> GetSummaryAsync()
     {
-        var totalOrders = await _dbContext.Orders.CountAsync();
+        var totalOrders = await _dbContext.Orders
+            .CountAsync();
         
-        var pendingOrders = await _dbContext.Orders.CountAsync(o => o.Status == OrderStatus.Pending);
-        var completedOrders = await _dbContext.Orders.CountAsync(o => o.Status == OrderStatus.Completed);
-        var cancelledOrders = await _dbContext.Orders.CountAsync(o => o.Status == OrderStatus.Cancelled);
-        
-        var totalRevenue = _dbContext.Orders.Where(o => o.Status == OrderStatus.Completed).Sum(o => o.TotalAmount);
-        var pendingRevenue = _dbContext.Orders.Where(o => o.Status == OrderStatus.Pending).Sum(o => o.TotalAmount);
+        var pendingOrders = await _dbContext.Orders
+            .CountAsync(o => o.Status == OrderStatus.Pending);
+        var completedOrders = await _dbContext.Orders
+            .CountAsync(o => o.Status == OrderStatus.Completed);
+        var cancelledOrders = await _dbContext.Orders
+            .CountAsync(o => o.Status == OrderStatus.Cancelled);
+
+        var totalRevenue = await _dbContext.Orders
+            .Where(o => o.Status == OrderStatus.Completed)
+            .SumAsync(o => o.TotalAmount);
+        var pendingRevenue = await _dbContext.Orders
+            .Where(o => o.Status == OrderStatus.Pending)
+            .SumAsync(o => o.TotalAmount);
 
         return new OrderSummaryDto
         {
@@ -178,25 +184,23 @@ public class OrderService : IOrderService
         if (pageSize <= 0 || pageSize > 50)
             pageSize = 10;
 
-        var query = _dbContext.Orders
-            .Include(o => o.OrderItems)
-            .AsQueryable();
+        OrderStatus? parsedStatus = null;
 
         if (!string.IsNullOrWhiteSpace(status))
         {
-            if (!Enum.TryParse<OrderStatus>(status, true, out var parsedStatus))
+            if (!Enum.TryParse<OrderStatus>(status, true, out var s))
                 throw new BadRequestException("Invalid order status filter.");
 
-            query = query.Where(o => o.Status == parsedStatus);
+            parsedStatus = s;
         }
 
-        var totalCount = await query.CountAsync();
+        var skip = (pageNumber - 1) * pageSize;
 
-        var orders = await query
-            .OrderByDescending(o => o.CreatedAt)
-            .Skip((pageNumber - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync();
+        var totalCount = await _orderRepository
+            .CountAsync(parsedStatus);
+
+        var orders = await _orderRepository
+            .GetPagedAsync(skip, pageSize, parsedStatus);
 
         var items = _mapper.Map<List<OrderDto>>(orders);
 
