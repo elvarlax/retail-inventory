@@ -7,12 +7,12 @@ namespace RetailInventory.Api.Services;
 public class CustomerService : ICustomerService
 {
     private readonly IDummyJsonService _dummyService;
-    private readonly ICustomerRepository _repository;
+    private readonly ICustomerRepository _customerRepository;
 
-    public CustomerService(IDummyJsonService dummyService, ICustomerRepository repository)
+    public CustomerService(IDummyJsonService dummyService, ICustomerRepository customerRepository)
     {
         _dummyService = dummyService;
-        _repository = repository;
+        _customerRepository = customerRepository;
     }
 
     public async Task<int> ImportFromExternalAsync()
@@ -22,7 +22,7 @@ public class CustomerService : ICustomerService
 
         foreach (var user in users)
         {
-            var exists = await _repository.ExistsByExternalIdAsync(user.Id);
+            var exists = await _customerRepository.ExistsByExternalIdAsync(user.Id);
 
             if (exists)
                 continue;
@@ -36,18 +36,18 @@ public class CustomerService : ICustomerService
                 Email = user.Email
             };
 
-            await _repository.AddAsync(customer);
+            await _customerRepository.AddAsync(customer);
             insertedCount++;
         }
 
-        await _repository.SaveChangesAsync();
+        await _customerRepository.SaveChangesAsync();
 
         return insertedCount;
     }
 
     public async Task<List<CustomerDto>> GetAllAsync()
     {
-        var customers = await _repository.GetAllAsync();
+        var customers = await _customerRepository.GetAllAsync();
 
         return customers.Select(c => new CustomerDto
         {
@@ -60,7 +60,7 @@ public class CustomerService : ICustomerService
 
     public async Task<CustomerDto?> GetByIdAsync(Guid id)
     {
-        var customer = await _repository.GetByIdAsync(id);
+        var customer = await _customerRepository.GetByIdAsync(id);
 
         if (customer == null)
             return null;

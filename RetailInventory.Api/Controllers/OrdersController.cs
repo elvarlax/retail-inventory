@@ -19,7 +19,16 @@ public class OrdersController : ControllerBase
     public async Task<IActionResult> Create(CreateOrderRequest request)
     {
         var orderId = await _orderService.CreateAsync(request);
-        return Ok(new { orderId });
+
+        var response = new CreateOrderResponse
+        {
+            OrderId = orderId
+        };
+
+        return CreatedAtAction(
+            nameof(GetById),
+            new { id = orderId },
+            response);
     }
 
     [HttpGet("{id}")]
@@ -58,5 +67,19 @@ public class OrdersController : ControllerBase
     {
         var result = await _orderService.GetPagedAsync(pageNumber, pageSize, status);
         return Ok(result);
+    }
+
+    [HttpPost("generate")]
+    public async Task<IActionResult> GenerateOrders(GenerateOrdersRequest request)
+    {
+        if (request.Count is < 1 or > 1000)
+            return BadRequest("Count must be between 1 and 1000.");
+
+        await _orderService.GenerateRandomOrdersAsync(request.Count);
+
+        return Ok(new ImportResultResponse
+        {
+            ImportedCount = request.Count
+        });
     }
 }

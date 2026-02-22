@@ -1,44 +1,43 @@
-﻿using Microsoft.EntityFrameworkCore;
-using RetailInventory.Api.Exceptions;
-using RetailInventory.Api.Data;
+﻿using AutoMapper;
 using RetailInventory.Api.DTOs;
+using RetailInventory.Api.Exceptions;
 using RetailInventory.Api.Models;
-using AutoMapper;
 using RetailInventory.Api.Repositories;
 
 namespace RetailInventory.Api.Services;
 
 public class OrderService : IOrderService
 {
-    private readonly RetailDbContext _dbContext;
     private readonly IOrderRepository _orderRepository;
+    private readonly ICustomerRepository _customerRepository;
+    private readonly IProductRepository _productRepository;
     private readonly IMapper _mapper;
 
-    public OrderService(RetailDbContext dbContext, IOrderRepository orderRepository, IMapper mapper)
+    public OrderService(
+        IOrderRepository orderRepository,
+        ICustomerRepository customerRepository,
+        IProductRepository productRepository,
+        IMapper mapper)
     {
-        _dbContext = dbContext;
         _orderRepository = orderRepository;
+        _customerRepository = customerRepository;
+        _productRepository = productRepository;
         _mapper = mapper;
     }
 
     public async Task<Guid> CreateAsync(CreateOrderRequest request)
     {
-        // Basic request validation
         if (request.CustomerId == Guid.Empty)
             throw new BadRequestException("CustomerId is required.");
 
         if (request.Items == null || !request.Items.Any())
             throw new BadRequestException("Order must contain at least one item.");
 
-        // Ensure customer exists
-        var customer = await _dbContext.Customers
-            .FirstOrDefaultAsync(c => c.Id == request.CustomerId);
-
+        var customer = await _customerRepository.GetByIdAsync(request.CustomerId);
         if (customer == null)
             throw new NotFoundException("Customer not found.");
 
-        // Begin transaction to ensure atomic order creation
-        using var transaction = await _dbContext.Database.BeginTransactionAsync();
+        using var transaction = await _orderRepository.BeginTransactionAsync();
 
         decimal total = 0m;
 
@@ -55,40 +54,31 @@ public class OrderService : IOrderService
             if (item.Quantity <= 0)
                 throw new BadRequestException("Quantity must be greater than zero.");
 
-            var product = await _dbContext.Products
-                .FirstOrDefaultAsync(p => p.Id == item.ProductId);
-
+            var product = await _productRepository.GetByIdAsync(item.ProductId);
             if (product == null)
                 throw new NotFoundException("Product not found.");
 
-            // Ensure sufficient stock
             if (product.StockQuantity < item.Quantity)
                 throw new BadRequestException($"Insufficient stock for product {product.Name}.");
 
-            // Deduct stock
             product.StockQuantity -= item.Quantity;
 
-            var orderItem = new OrderItem
+            order.OrderItems.Add(new OrderItem
             {
                 Id = Guid.NewGuid(),
-                OrderId = order.Id,
-                ProductId = item.ProductId,
+                ProductId = product.Id,
                 Quantity = item.Quantity,
                 UnitPrice = product.Price
-            };
+            });
 
             total += product.Price * item.Quantity;
-
-            order.OrderItems.Add(orderItem);
         }
 
         order.TotalAmount = total;
 
         await _orderRepository.AddAsync(order);
-
         await _orderRepository.SaveChangesAsync();
 
-        // Commit transaction only after all changes succeed
         await transaction.CommitAsync();
 
         return order.Id;
@@ -131,14 +121,9 @@ public class OrderService : IOrderService
 
         foreach (var item in order.OrderItems)
         {
-            var product = await _dbContext.Products
-                .FirstOrDefaultAsync(p => p.Id == item.ProductId);
-
+            var product = await _productRepository.GetByIdAsync(item.ProductId);
             if (product != null)
-            {
-                // Restock the product
                 product.StockQuantity += item.Quantity;
-            }
         }
 
         order.Status = OrderStatus.Cancelled;
@@ -148,41 +133,13 @@ public class OrderService : IOrderService
 
     public async Task<OrderSummaryDto> GetSummaryAsync()
     {
-        var totalOrders = await _dbContext.Orders
-            .CountAsync();
-        
-        var pendingOrders = await _dbContext.Orders
-            .CountAsync(o => o.Status == OrderStatus.Pending);
-        var completedOrders = await _dbContext.Orders
-            .CountAsync(o => o.Status == OrderStatus.Completed);
-        var cancelledOrders = await _dbContext.Orders
-            .CountAsync(o => o.Status == OrderStatus.Cancelled);
-
-        var totalRevenue = await _dbContext.Orders
-            .Where(o => o.Status == OrderStatus.Completed)
-            .SumAsync(o => o.TotalAmount);
-        var pendingRevenue = await _dbContext.Orders
-            .Where(o => o.Status == OrderStatus.Pending)
-            .SumAsync(o => o.TotalAmount);
-
-        return new OrderSummaryDto
-        {
-            TotalOrders = totalOrders,
-            PendingOrders = pendingOrders,
-            CompletedOrders = completedOrders,
-            CancelledOrders = cancelledOrders,
-            TotalRevenue = totalRevenue,
-            PendingRevenue = pendingRevenue
-        };
+        return await _orderRepository.GetSummaryAsync();
     }
 
     public async Task<PagedResultDto<OrderDto>> GetPagedAsync(int pageNumber, int pageSize, string? status)
     {
-        if (pageNumber <= 0)
-            pageNumber = 1;
-
-        if (pageSize <= 0 || pageSize > 50)
-            pageSize = 10;
+        if (pageNumber <= 0) pageNumber = 1;
+        if (pageSize <= 0 || pageSize > 50) pageSize = 10;
 
         OrderStatus? parsedStatus = null;
 
@@ -196,20 +153,53 @@ public class OrderService : IOrderService
 
         var skip = (pageNumber - 1) * pageSize;
 
-        var totalCount = await _orderRepository
-            .CountAsync(parsedStatus);
-
-        var orders = await _orderRepository
-            .GetPagedAsync(skip, pageSize, parsedStatus);
-
-        var items = _mapper.Map<List<OrderDto>>(orders);
+        var totalCount = await _orderRepository.CountAsync(parsedStatus);
+        var orders = await _orderRepository.GetPagedAsync(skip, pageSize, parsedStatus);
 
         return new PagedResultDto<OrderDto>
         {
-            Items = items,
+            Items = _mapper.Map<List<OrderDto>>(orders),
             TotalCount = totalCount,
             PageNumber = pageNumber,
             PageSize = pageSize
         };
+    }
+
+    public async Task GenerateRandomOrdersAsync(int count)
+    {
+        var customers = await _customerRepository.GetAllAsync();
+        var products = await _productRepository.GetAllAsync();
+
+        if (!customers.Any() || !products.Any())
+            return;
+
+        var random = new Random();
+
+        for (int i = 0; i < count; i++)
+        {
+            var customer = customers[random.Next(customers.Count)];
+            var product = products[random.Next(products.Count)];
+            var quantity = random.Next(1, 4);
+
+            try
+            {
+                await CreateAsync(new CreateOrderRequest
+                {
+                    CustomerId = customer.Id,
+                    Items =
+                    {
+                        new CreateOrderItemRequest
+                        {
+                            ProductId = product.Id,
+                            Quantity = quantity
+                        }
+                    }
+                });
+            }
+            catch
+            {
+                // ignore failures
+            }
+        }
     }
 }

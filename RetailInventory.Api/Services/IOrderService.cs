@@ -10,4 +10,5 @@ public interface IOrderService
     Task CancelAsync(Guid id);
     Task<OrderSummaryDto> GetSummaryAsync();
     Task<PagedResultDto<OrderDto>> GetPagedAsync(int pageNumber, int pageSize, string? status);
+    Task GenerateRandomOrdersAsync(int count);
 }

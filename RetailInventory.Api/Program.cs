@@ -4,6 +4,7 @@ using RetailInventory.Api.Services;
 using RetailInventory.Api.Repositories;
 using RetailInventory.Api.Middleware;
 using RetailInventory.Api.Mappings;
+using System.Threading;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -55,5 +56,30 @@ app.UseMiddleware<ExceptionMiddleware>();
 app.UseHttpsRedirection();
 app.UseAuthorization();
 app.MapControllers();
+
+// Apply migrations automatically (not in Testing)
+if (!app.Environment.IsEnvironment("Testing"))
+{
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<RetailDbContext>();
+
+    var retries = 10;
+    while (retries > 0)
+    {
+        try
+        {
+            db.Database.Migrate();
+            break;
+        }
+        catch
+        {
+            retries--;
+            Thread.Sleep(3000);
+        }
+    }
+
+    if (retries == 0)
+        throw new Exception("Database migration failed after multiple retries.");
+}
 
 app.Run();

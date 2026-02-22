@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using RetailInventory.Api.DTOs;
 using RetailInventory.Api.Services;
 
 namespace RetailInventory.Api.Controllers;
@@ -18,7 +19,11 @@ public class ProductsController : ControllerBase
     public async Task<IActionResult> ImportProducts()
     {
         var count = await _productService.ImportFromExternalAsync();
-        return Ok(new { ImportedCount = count });
+
+        return Ok(new ImportResultResponse
+        {
+            ImportedCount = count
+        });
     }
 
     [HttpGet]

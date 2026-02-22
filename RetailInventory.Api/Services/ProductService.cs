@@ -7,17 +7,17 @@ namespace RetailInventory.Api.Services;
 public class ProductService : IProductService
 {
     private readonly IDummyJsonService _dummyService;
-    private readonly IProductRepository _repository;
+    private readonly IProductRepository _productRepository;
 
-    public ProductService(IDummyJsonService dummyService, IProductRepository repository)
+    public ProductService(IDummyJsonService dummyService, IProductRepository productRepository)
     {
         _dummyService = dummyService;
-        _repository = repository;
+        _productRepository = productRepository;
     }
 
     public async Task<List<ProductDto>> GetAllAsync()
     {
-        var products = await _repository.GetAllAsync();
+        var products = await _productRepository.GetAllAsync();
 
         return products.Select(p => new ProductDto
         {
@@ -31,7 +31,7 @@ public class ProductService : IProductService
 
     public async Task<ProductDto?> GetByIdAsync(Guid id)
     {
-        var product = await _repository.GetByIdAsync(id);
+        var product = await _productRepository.GetByIdAsync(id);
 
         if (product == null)
             return null;
@@ -53,7 +53,7 @@ public class ProductService : IProductService
 
         foreach (var item in externalProducts)
         {
-            var exists = await _repository.ExistsByExternalIdAsync(item.Id);
+            var exists = await _productRepository.ExistsByExternalIdAsync(item.Id);
 
             if (exists)
                 continue;
@@ -68,11 +68,11 @@ public class ProductService : IProductService
                 Price = item.Price
             };
 
-            await _repository.AddAsync(product);
+            await _productRepository.AddAsync(product);
             inserted++;
         }
 
-        await _repository.SaveChangesAsync();
+        await _productRepository.SaveChangesAsync();
         return inserted;
     }
 }

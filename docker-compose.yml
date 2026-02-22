@@ -1,0 +1,29 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: retailinventory_postgres
+    restart: always
+    environment:
+      POSTGRES_DB: retail_inventory
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432" # avoids conflict with local Postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  api:
+    build:
+      context: .
+      dockerfile: RetailInventory.Api/Dockerfile
+    container_name: retailinventory_api
+    depends_on:
+      - postgres
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=retail_inventory;Username=postgres;Password=postgres
+    ports:
+      - "8080:8080"
+
+volumes:
+  postgres_data:

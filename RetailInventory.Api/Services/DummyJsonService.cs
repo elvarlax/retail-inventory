@@ -21,7 +21,8 @@ public class DummyJsonService : IDummyJsonService
 
         while (skip < total)
         {
-            var response = await _httpClient.GetFromJsonAsync<DummyJsonProductResponse>($"products?limit={limit}&skip={skip}");
+            var response = await _httpClient
+                .GetFromJsonAsync<DummyJsonProductResponse>($"products?limit={limit}&skip={skip}");
 
             if (response == null || response.Products.Count == 0)
                 break;
@@ -45,7 +46,8 @@ public class DummyJsonService : IDummyJsonService
 
         while (skip < total)
         {
-            var response = await _httpClient.GetFromJsonAsync<DummyJsonUserResponse>($"users?limit={limit}&skip={skip}");
+            var response = await _httpClient
+                .GetFromJsonAsync<DummyJsonUserResponse>($"users?limit={limit}&skip={skip}");
             
             if (response == null || response.Users.Count == 0)
                 break;

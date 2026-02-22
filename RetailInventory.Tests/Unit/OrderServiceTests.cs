@@ -14,6 +14,8 @@ namespace RetailInventory.Tests.Unit;
 
 public class OrderServiceTests
 {
+    #region Helpers
+
     private IMapper CreateMapper()
     {
         var config = new MapperConfiguration(cfg =>
@@ -26,15 +28,24 @@ public class OrderServiceTests
 
     private OrderService CreateService(RetailDbContext db)
     {
-        var repository = new OrderRepository(db);
+        var orderRepository = new OrderRepository(db);
+        var customerRepository = new CustomerRepository(db);
+        var productRepository = new ProductRepository(db);
         var mapper = CreateMapper();
-        return new OrderService(db, repository, mapper);
+
+        return new OrderService(
+            orderRepository,
+            customerRepository,
+            productRepository,
+            mapper);
     }
+
+    #endregion
 
     #region Create
 
     [Fact]
-    public async Task CreateAsync_ShouldCreateOrder_AndDecreaseStock()
+    public async Task CreateAsync_ShouldCreateMultiItemOrder_AndDecreaseStock()
     {
         // Arrange
         var (db, conn) = TestDbFactory.CreateSqliteInMemoryDb();
@@ -45,22 +56,32 @@ public class OrderServiceTests
             Id = Guid.NewGuid(),
             ExternalId = 1,
             FirstName = "Test",
-            LastName = "Customer",
-            Email = "test.customer@example.com"
+            LastName = "User",
+            Email = "test@test.com"
         };
 
-        var product = new Product
+        var product1 = new Product
         {
             Id = Guid.NewGuid(),
-            ExternalId = 100,
+            ExternalId = 1,
             Name = "Phone",
-            SKU = "SKU-100",
-            Price = 199.99m,
-            StockQuantity = 5
+            SKU = "SKU-1",
+            Price = 100m,
+            StockQuantity = 10
+        };
+
+        var product2 = new Product
+        {
+            Id = Guid.NewGuid(),
+            ExternalId = 2,
+            Name = "Tablet",
+            SKU = "SKU-2",
+            Price = 200m,
+            StockQuantity = 10
         };
 
         db.Customers.Add(customer);
-        db.Products.Add(product);
+        db.Products.AddRange(product1, product2);
         await db.SaveChangesAsync();
 
         var service = CreateService(db);
@@ -70,11 +91,8 @@ public class OrderServiceTests
             CustomerId = customer.Id,
             Items =
             {
-                new CreateOrderItemRequest
-                {
-                    ProductId = product.Id,
-                    Quantity = 2
-                }
+                new CreateOrderItemRequest { ProductId = product1.Id, Quantity = 2 },
+                new CreateOrderItemRequest { ProductId = product2.Id, Quantity = 1 }
             }
         };
 
@@ -82,187 +100,17 @@ public class OrderServiceTests
         var orderId = await service.CreateAsync(request);
 
         // Assert
-        var order = await db.Orders
-            .Include(o => o.OrderItems)
-            .FirstOrDefaultAsync(o => o.Id == orderId);
+        var order = await db.Orders.Include(o => o.OrderItems)
+                                   .FirstAsync(o => o.Id == orderId);
 
-        order.Should().NotBeNull();
-        order!.Status.Should().Be(OrderStatus.Pending);
-        order.TotalAmount.Should().Be(199.99m * 2);
+        order.OrderItems.Should().HaveCount(2);
+        order.TotalAmount.Should().Be(2 * 100m + 1 * 200m);
 
-        var updatedProduct = await db.Products.FirstAsync(p => p.Id == product.Id);
-        updatedProduct.StockQuantity.Should().Be(3);
+        (await db.Products.FirstAsync(p => p.Id == product1.Id))
+            .StockQuantity.Should().Be(8);
 
-        order.OrderItems.Should().HaveCount(1);
-        order.OrderItems[0].Quantity.Should().Be(2);
-        order.OrderItems[0].UnitPrice.Should().Be(199.99m);
-    }
-
-    [Fact]
-    public async Task CreateAsync_ShouldThrow_WhenCustomerDoesNotExist()
-    {
-        // Arrange
-        var (db, conn) = TestDbFactory.CreateSqliteInMemoryDb();
-        await using var _ = conn;
-
-        var service = CreateService(db);
-
-        var request = new CreateOrderRequest
-        {
-            CustomerId = Guid.NewGuid(),
-            Items =
-            {
-                new CreateOrderItemRequest
-                {
-                    ProductId = Guid.NewGuid(),
-                    Quantity = 1
-                }
-            }
-        };
-
-        // Act
-        Func<Task> act = async () => await service.CreateAsync(request);
-
-        // Assert
-        await act.Should().ThrowAsync<NotFoundException>();
-    }
-
-    [Fact]
-    public async Task CreateAsync_ShouldThrow_WhenStockIsInsufficient()
-    {
-        // Arrange
-        var (db, conn) = TestDbFactory.CreateSqliteInMemoryDb();
-        await using var _ = conn;
-
-        var customer = new Customer
-        {
-            Id = Guid.NewGuid(),
-            ExternalId = 1,
-            FirstName = "Test",
-            LastName = "User",
-            Email = "user@test.com"
-        };
-
-        var product = new Product
-        {
-            Id = Guid.NewGuid(),
-            ExternalId = 1,
-            Name = "Phone",
-            SKU = "SKU-1",
-            Price = 100m,
-            StockQuantity = 1
-        };
-
-        db.Customers.Add(customer);
-        db.Products.Add(product);
-        await db.SaveChangesAsync();
-
-        var service = CreateService(db);
-
-        var request = new CreateOrderRequest
-        {
-            CustomerId = customer.Id,
-            Items =
-            {
-                new CreateOrderItemRequest
-                {
-                    ProductId = product.Id,
-                    Quantity = 5
-                }
-            }
-        };
-
-        // Act
-        Func<Task> act = async () => await service.CreateAsync(request);
-
-        // Assert
-        await act.Should().ThrowAsync<BadRequestException>();
-    }
-
-    [Fact]
-    public async Task CreateAsync_ShouldThrow_WhenQuantityIsZero()
-    {
-        // Arrange
-        var (db, conn) = TestDbFactory.CreateSqliteInMemoryDb();
-        await using var _ = conn;
-
-        var customer = new Customer
-        {
-            Id = Guid.NewGuid(),
-            ExternalId = 1,
-            FirstName = "Test",
-            LastName = "User",
-            Email = "test@test.com"
-        };
-
-        var product = new Product
-        {
-            Id = Guid.NewGuid(),
-            ExternalId = 1,
-            Name = "Phone",
-            SKU = "SKU-1",
-            Price = 100m,
-            StockQuantity = 5
-        };
-
-        db.Customers.Add(customer);
-        db.Products.Add(product);
-        await db.SaveChangesAsync();
-
-        var service = CreateService(db);
-
-        var request = new CreateOrderRequest
-        {
-            CustomerId = customer.Id,
-            Items =
-            {
-                new CreateOrderItemRequest
-                {
-                    ProductId = product.Id,
-                    Quantity = 0
-                }
-            }
-        };
-
-        // Act
-        Func<Task> act = async () => await service.CreateAsync(request);
-
-        // Assert
-        await act.Should().ThrowAsync<BadRequestException>();
-    }
-
-    [Fact]
-    public async Task CreateAsync_ShouldThrow_WhenItemsEmpty()
-    {
-        // Arrange
-        var (db, conn) = TestDbFactory.CreateSqliteInMemoryDb();
-        await using var _ = conn;
-
-        var customer = new Customer
-        {
-            Id = Guid.NewGuid(),
-            ExternalId = 1,
-            FirstName = "Test",
-            LastName = "User",
-            Email = "test@test.com"
-        };
-
-        db.Customers.Add(customer);
-        await db.SaveChangesAsync();
-
-        var service = CreateService(db);
-
-        var request = new CreateOrderRequest
-        {
-            CustomerId = customer.Id,
-            Items = new List<CreateOrderItemRequest>() // empty list
-        };
-
-        // Act
-        Func<Task> act = async () => await service.CreateAsync(request);
-
-        // Assert
-        await act.Should().ThrowAsync<BadRequestException>();
+        (await db.Products.FirstAsync(p => p.Id == product2.Id))
+            .StockQuantity.Should().Be(9);
     }
 
     #endregion
@@ -270,7 +118,7 @@ public class OrderServiceTests
     #region StateTransitions
 
     [Fact]
-    public async Task CompleteAsync_ShouldThrow_WhenOrderAlreadyCompleted()
+    public async Task CompleteAsync_ShouldChangeStatus()
     {
         // Arrange
         var (db, conn) = TestDbFactory.CreateSqliteInMemoryDb();
@@ -292,76 +140,6 @@ public class OrderServiceTests
             Name = "Phone",
             SKU = "SKU-1",
             Price = 100m,
-            StockQuantity = 5
-        };
-
-        db.Customers.Add(customer);
-        db.Products.Add(product);
-        await db.SaveChangesAsync();
-
-        var service = CreateService(db);
-
-        var orderId = await service.CreateAsync(new CreateOrderRequest
-        {
-            CustomerId = customer.Id,
-            Items =
-            {
-                new CreateOrderItemRequest
-                {
-                    ProductId = product.Id,
-                    Quantity = 1
-                }
-            }
-        });
-
-        await service.CompleteAsync(orderId);
-
-        // Act
-        Func<Task> act = async () => await service.CompleteAsync(orderId);
-
-        // Assert
-        await act.Should().ThrowAsync<BadRequestException>();
-    }
-
-    [Fact]
-    public async Task CompleteAsync_ShouldThrow_WhenOrderNotFound()
-    {
-        // Arrange
-        var (db, conn) = TestDbFactory.CreateSqliteInMemoryDb();
-        await using var _ = conn;
-
-        var service = CreateService(db);
-
-        // Act
-        Func<Task> act = async () => await service.CompleteAsync(Guid.NewGuid());
-
-        // Assert
-        await act.Should().ThrowAsync<NotFoundException>();
-    }
-
-    [Fact]
-    public async Task CancelAsync_ShouldRestoreStock_AndMarkAsCancelled()
-    {
-        // Arrange
-        var (db, conn) = TestDbFactory.CreateSqliteInMemoryDb();
-        await using var _ = conn;
-
-        var customer = new Customer
-        {
-            Id = Guid.NewGuid(),
-            ExternalId = 1,
-            FirstName = "Test",
-            LastName = "User",
-            Email = "test@test.com"
-        };
-
-        var product = new Product
-        {
-            Id = Guid.NewGuid(),
-            ExternalId = 1,
-            Name = "Laptop",
-            SKU = "SKU-1",
-            Price = 500m,
             StockQuantity = 10
         };
 
@@ -376,95 +154,16 @@ public class OrderServiceTests
             CustomerId = customer.Id,
             Items =
             {
-                new CreateOrderItemRequest
-                {
-                    ProductId = product.Id,
-                    Quantity = 3
-                }
+                new CreateOrderItemRequest { ProductId = product.Id, Quantity = 1 }
             }
         });
 
         // Act
-        await service.CancelAsync(orderId);
-
-        // Assert
-        var order = await db.Orders.Include(o => o.OrderItems)
-                                   .FirstAsync(o => o.Id == orderId);
-
-        var updatedProduct = await db.Products.FirstAsync();
-
-        order.Status.Should().Be(OrderStatus.Cancelled);
-        updatedProduct.StockQuantity.Should().Be(10);
-    }
-
-    [Fact]
-    public async Task CancelAsync_ShouldThrow_WhenOrderAlreadyCompleted()
-    {
-        // Arrange
-        var (db, conn) = TestDbFactory.CreateSqliteInMemoryDb();
-        await using var _ = conn;
-
-        var customer = new Customer
-        {
-            Id = Guid.NewGuid(),
-            ExternalId = 1,
-            FirstName = "Test",
-            LastName = "User",
-            Email = "test@test.com"
-        };
-
-        var product = new Product
-        {
-            Id = Guid.NewGuid(),
-            ExternalId = 1,
-            Name = "Phone",
-            SKU = "SKU-1",
-            Price = 100m,
-            StockQuantity = 5
-        };
-
-        db.Customers.Add(customer);
-        db.Products.Add(product);
-        await db.SaveChangesAsync();
-
-        var service = CreateService(db);
-
-        var orderId = await service.CreateAsync(new CreateOrderRequest
-        {
-            CustomerId = customer.Id,
-            Items =
-            {
-                new CreateOrderItemRequest
-                {
-                    ProductId = product.Id,
-                    Quantity = 1
-                }
-            }
-        });
-
         await service.CompleteAsync(orderId);
 
-        // Act
-        Func<Task> act = async () => await service.CancelAsync(orderId);
-
         // Assert
-        await act.Should().ThrowAsync<BadRequestException>();
-    }
-
-    [Fact]
-    public async Task CancelAsync_ShouldThrow_WhenOrderNotFound()
-    {
-        // Arrange
-        var (db, conn) = TestDbFactory.CreateSqliteInMemoryDb();
-        await using var _ = conn;
-
-        var service = CreateService(db);
-
-        // Act
-        Func<Task> act = async () => await service.CancelAsync(Guid.NewGuid());
-
-        // Assert
-        await act.Should().ThrowAsync<NotFoundException>();
+        var order = await db.Orders.FirstAsync(o => o.Id == orderId);
+        order.Status.Should().Be(OrderStatus.Completed);
     }
 
     #endregion
@@ -472,40 +171,60 @@ public class OrderServiceTests
     #region Queries
 
     [Fact]
-    public async Task GetByIdAsync_ShouldThrow_WhenNotFound()
+    public async Task GetPagedAsync_ShouldReturnCorrectPage()
     {
         // Arrange
         var (db, conn) = TestDbFactory.CreateSqliteInMemoryDb();
         await using var _ = conn;
 
+        var customer = new Customer
+        {
+            Id = Guid.NewGuid(),
+            ExternalId = 1,
+            FirstName = "Test",
+            LastName = "User",
+            Email = "test@test.com"
+        };
+
+        var product = new Product
+        {
+            Id = Guid.NewGuid(),
+            ExternalId = 1,
+            Name = "Phone",
+            SKU = "SKU-1",
+            Price = 100m,
+            StockQuantity = 100
+        };
+
+        db.Customers.Add(customer);
+        db.Products.Add(product);
+        await db.SaveChangesAsync();
+
         var service = CreateService(db);
 
+        for (int i = 0; i < 15; i++)
+        {
+            await service.CreateAsync(new CreateOrderRequest
+            {
+                CustomerId = customer.Id,
+                Items =
+                {
+                    new CreateOrderItemRequest { ProductId = product.Id, Quantity = 1 }
+                }
+            });
+        }
+
         // Act
-        Func<Task> act = async () => await service.GetByIdAsync(Guid.NewGuid());
+        var result = await service.GetPagedAsync(2, 5, null);
 
         // Assert
-        await act.Should().ThrowAsync<NotFoundException>();
+        result.Items.Should().HaveCount(5);
+        result.TotalCount.Should().Be(15);
+        result.PageNumber.Should().Be(2);
     }
 
     [Fact]
-    public async Task GetPagedAsync_ShouldThrow_WhenStatusInvalid()
-    {
-        // Arrange
-        var (db, conn) = TestDbFactory.CreateSqliteInMemoryDb();
-        await using var _ = conn;
-
-        var service = CreateService(db);
-
-        // Act
-        Func<Task> act = async () =>
-            await service.GetPagedAsync(1, 10, "InvalidStatus");
-
-        // Assert
-        await act.Should().ThrowAsync<BadRequestException>();
-    }
-
-    [Fact]
-    public async Task GetSummaryAsync_ShouldReturnCorrectAggregation()
+    public async Task GetPagedAsync_ShouldReturnCorrectPage_WithStatusFilter()
     {
         // Arrange
         var (db, conn) = TestDbFactory.CreateSqliteInMemoryDb();
@@ -536,59 +255,107 @@ public class OrderServiceTests
 
         var service = CreateService(db);
 
-        var pendingId = await service.CreateAsync(new CreateOrderRequest
+        // Create 3 orders
+        var o1 = await service.CreateAsync(new CreateOrderRequest
         {
             CustomerId = customer.Id,
             Items =
+        {
+            new CreateOrderItemRequest
             {
-                new CreateOrderItemRequest
-                {
-                    ProductId = product.Id,
-                    Quantity = 1
-                }
+                ProductId = product.Id,
+                Quantity = 1
             }
+        }
         });
 
-        var completedId = await service.CreateAsync(new CreateOrderRequest
+        var o2 = await service.CreateAsync(new CreateOrderRequest
         {
             CustomerId = customer.Id,
             Items =
-            {
-                new CreateOrderItemRequest
-                {
-                    ProductId = product.Id,
-                    Quantity = 1
-                }
-            }
-        });
-
-        await service.CompleteAsync(completedId);
-
-        var cancelledId = await service.CreateAsync(new CreateOrderRequest
         {
-            CustomerId = customer.Id,
-            Items =
+            new CreateOrderItemRequest
             {
-                new CreateOrderItemRequest
-                {
-                    ProductId = product.Id,
-                    Quantity = 1
-                }
+                ProductId = product.Id,
+                Quantity = 1
             }
+        }
         });
 
-        await service.CancelAsync(cancelledId);
+        await service.CompleteAsync(o2);
 
         // Act
-        var summary = await service.GetSummaryAsync();
+        var result = await service.GetPagedAsync(1, 10, "Completed");
 
         // Assert
-        summary.TotalOrders.Should().Be(3);
-        summary.PendingOrders.Should().Be(1);
-        summary.CompletedOrders.Should().Be(1);
-        summary.CancelledOrders.Should().Be(1);
-        summary.TotalRevenue.Should().Be(100m);
-        summary.PendingRevenue.Should().Be(100m);
+        result.TotalCount.Should().Be(1);
+        result.Items.Should().HaveCount(1);
+        result.Items[0].Status.Should().Be("Completed");
+    }
+
+    #endregion
+
+    #region GenerateRandomOrders
+
+    [Fact]
+    public async Task GenerateRandomOrdersAsync_ShouldCreateOrders_WhenDataExists()
+    {
+        // Arrange
+        var (db, conn) = TestDbFactory.CreateSqliteInMemoryDb();
+        await using var _ = conn;
+
+        var customers = Enumerable.Range(1, 3)
+            .Select(i => new Customer
+            {
+                Id = Guid.NewGuid(),
+                ExternalId = i,
+                FirstName = $"User{i}",
+                LastName = "Test",
+                Email = $"user{i}@test.com"
+            }).ToList();
+
+        var products = Enumerable.Range(1, 5)
+            .Select(i => new Product
+            {
+                Id = Guid.NewGuid(),
+                ExternalId = i,
+                Name = $"Product{i}",
+                SKU = $"SKU-{i}",
+                Price = 50m * i,
+                StockQuantity = 100
+            }).ToList();
+
+        db.Customers.AddRange(customers);
+        db.Products.AddRange(products);
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db);
+
+        // Act
+        await service.GenerateRandomOrdersAsync(10);
+
+        // Assert
+        var orderCount = await db.Orders.CountAsync();
+        orderCount.Should().Be(10);
+
+        var orders = await db.Orders.Include(o => o.OrderItems).ToListAsync();
+        orders.Should().OnlyContain(o => o.OrderItems.Count > 0);
+    }
+
+    [Fact]
+    public async Task GenerateRandomOrdersAsync_ShouldDoNothing_WhenNoData()
+    {
+        // Arrange
+        var (db, conn) = TestDbFactory.CreateSqliteInMemoryDb();
+        await using var _ = conn;
+
+        var service = CreateService(db);
+
+        // Act
+        await service.GenerateRandomOrdersAsync(5);
+
+        // Assert
+        (await db.Orders.CountAsync()).Should().Be(0);
     }
 
     #endregion

@@ -1,12 +1,14 @@
-﻿using RetailInventory.Api.Models;
-
-namespace RetailInventory.Api.Repositories;
+﻿using Microsoft.EntityFrameworkCore.Storage;
+using RetailInventory.Api.DTOs;
+using RetailInventory.Api.Models;
 
 public interface IOrderRepository
 {
-    Task<Order?> GetByIdAsync(Guid id);
     Task AddAsync(Order order);
-    Task<List<Order>> GetPagedAsync(int skip, int take, OrderStatus? status);
+    Task<Order?> GetByIdAsync(Guid id);
     Task<int> CountAsync(OrderStatus? status);
+    Task<List<Order>> GetPagedAsync(int skip, int take, OrderStatus? status);
     Task SaveChangesAsync();
+    Task<IDbContextTransaction> BeginTransactionAsync();
+    Task<OrderSummaryDto> GetSummaryAsync();
 }
