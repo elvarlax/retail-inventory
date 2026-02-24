@@ -13,6 +13,7 @@ public class RetailDbContext : DbContext
     public DbSet<Customer> Customers => Set<Customer>();
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
+    public DbSet<User> Users => Set<User>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -42,6 +43,12 @@ public class RetailDbContext : DbContext
             entity.ToTable("order_items");
             entity.HasOne(oi => oi.Order).WithMany(o => o.OrderItems).HasForeignKey(oi => oi.OrderId);
             entity.HasOne(oi => oi.Product).WithMany().HasForeignKey(oi => oi.ProductId);
+        });
+
+        modelBuilder.Entity<User>(entity =>
+        {
+            entity.ToTable("users");
+            entity.HasIndex(u => u.Email).IsUnique();
         });
     }
 }
