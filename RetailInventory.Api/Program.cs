@@ -44,7 +44,9 @@ if (!builder.Environment.IsEnvironment("Testing"))
 {
     builder.Services.AddDbContext<RetailDbContext>(options =>
     {
-        options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"));
+        options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"))
+                // Ensure snake case naming in PostgreSQL
+               .UseSnakeCaseNamingConvention();
     });
 }
 
@@ -145,23 +147,16 @@ if (!app.Environment.IsEnvironment("Testing"))
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<RetailDbContext>();
 
-    var retries = 10;
-    while (retries > 0)
+    try
     {
-        try
-        {
-            db.Database.Migrate();
-            break;
-        }
-        catch
-        {
-            retries--;
-            Thread.Sleep(3000);
-        }
+        db.Database.Migrate();
+        Console.WriteLine("Database migrated successfully.");
     }
-
-    if (retries == 0)
-        throw new Exception("Database migration failed after multiple retries.");
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Migration failed: {ex}");
+        throw;
+    }
 }
 
 // Seed initial user data
