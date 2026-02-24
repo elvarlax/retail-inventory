@@ -105,6 +105,7 @@ public class OrderService : IOrderService
             throw new BadRequestException("Only pending orders can be completed.");
 
         order.Status = OrderStatus.Completed;
+        order.CompletedAt = DateTime.UtcNow;
 
         await _orderRepository.SaveChangesAsync();
     }
@@ -194,18 +195,31 @@ public class OrderService : IOrderService
 
             try
             {
-                await CreateAsync(new CreateOrderRequest
+                var orderId = await CreateAsync(new CreateOrderRequest
                 {
                     CustomerId = customer.Id,
                     Items =
+                {
+                    new CreateOrderItemRequest
                     {
-                        new CreateOrderItemRequest
-                        {
-                            ProductId = product.Id,
-                            Quantity = quantity
-                        }
+                        ProductId = product.Id,
+                        Quantity = quantity
                     }
+                }
                 });
+
+                // Random status distribution
+                var roll = random.Next(1, 101);
+
+                if (roll <= 60)
+                {
+                    await CompleteAsync(orderId);
+                }
+                else if (roll <= 80)
+                {
+                    await CancelAsync(orderId);
+                }
+                // else: keep as Pending
             }
             catch
             {

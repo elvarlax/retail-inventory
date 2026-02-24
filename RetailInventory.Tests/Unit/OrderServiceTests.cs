@@ -163,6 +163,7 @@ public class OrderServiceTests
         // Assert
         var order = await db.Orders.FirstAsync(o => o.Id == orderId);
         order.Status.Should().Be(OrderStatus.Completed);
+        order.CompletedAt.Should().NotBeNull();
     }
 
     #endregion

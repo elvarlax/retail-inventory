@@ -61,13 +61,13 @@ public class OrdersIntegrationTests : IntegrationTestBase
         {
             CustomerId = customer.Id,
             Items =
+        {
+            new CreateOrderItemRequest
             {
-                new CreateOrderItemRequest
-                {
-                    ProductId = product.Id,
-                    Quantity = 2
-                }
+                ProductId = product.Id,
+                Quantity = 2
             }
+        }
         };
 
         var response = await client.PostAsJsonAsync("/api/orders", request);
@@ -90,7 +90,11 @@ public class OrdersIntegrationTests : IntegrationTestBase
             .FirstOrDefaultAsync(o => o.Id == orderId);
 
         order.Should().NotBeNull();
-        order!.OrderItems.Should().HaveCount(1);
+
+        order!.Status.Should().Be(OrderStatus.Pending);
+        order.CompletedAt.Should().BeNull();
+
+        order.OrderItems.Should().HaveCount(1);
         order.TotalAmount.Should().Be(200m);
     }
 
@@ -140,7 +144,83 @@ public class OrdersIntegrationTests : IntegrationTestBase
         using var verificationScope = _factory.Services.CreateScope();
         var verificationDb = verificationScope.ServiceProvider.GetRequiredService<RetailDbContext>();
 
-        var totalOrders = await verificationDb.Orders.CountAsync();
-        totalOrders.Should().Be(5);
+        var orders = await verificationDb.Orders.ToListAsync();
+
+        orders.Should().HaveCount(5);
+
+        orders.Select(o => o.Status)
+              .Should()
+              .OnlyContain(s =>
+                  s == OrderStatus.Pending ||
+                  s == OrderStatus.Completed ||
+                  s == OrderStatus.Cancelled);
+    }
+
+    [Fact]
+    public async Task CompleteOrder_ShouldSetCompletedAt()
+    {
+        var client = await CreateFreshUserClientAsync();
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<RetailDbContext>();
+
+        var customer = new Customer
+        {
+            Id = Guid.NewGuid(),
+            ExternalId = 1,
+            FirstName = "Integration",
+            LastName = "User",
+            Email = "integration@test.com"
+        };
+
+        var product = new Product
+        {
+            Id = Guid.NewGuid(),
+            ExternalId = 1,
+            Name = "IntegrationPhone",
+            SKU = "INT-1",
+            Price = 100m,
+            StockQuantity = 10
+        };
+
+        db.Customers.Add(customer);
+        db.Products.Add(product);
+        await db.SaveChangesAsync();
+
+        // Create order
+        var createResponse = await client.PostAsJsonAsync("/api/orders", new CreateOrderRequest
+        {
+            CustomerId = customer.Id,
+            Items =
+        {
+            new CreateOrderItemRequest
+            {
+                ProductId = product.Id,
+                Quantity = 2
+            }
+        }
+        });
+
+        createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var createResult = await createResponse.Content.ReadFromJsonAsync<CreateOrderResponse>();
+        var orderId = createResult!.OrderId;
+
+        // Complete order
+        var completeResponse = await client.PostAsync($"/api/orders/{orderId}/complete", null);
+
+        completeResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        using var verifyScope = _factory.Services.CreateScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<RetailDbContext>();
+
+        var order = await verifyDb.Orders.FirstAsync(o => o.Id == orderId);
+
+        order.Status.Should().Be(OrderStatus.Completed);
+        order.CompletedAt.Should().NotBeNull();
+
+        // Stock should remain deducted (already reduced at create)
+        var updatedProduct = await verifyDb.Products.FirstAsync();
+        updatedProduct.StockQuantity.Should().Be(8);
     }
 }
