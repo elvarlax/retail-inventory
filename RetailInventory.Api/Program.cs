@@ -1,16 +1,25 @@
-using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
-using System.Text;
 using RetailInventory.Api.Data;
-using RetailInventory.Api.Services;
-using RetailInventory.Api.Repositories;
-using RetailInventory.Api.Middleware;
 using RetailInventory.Api.Mappings;
-using System.Threading;
+using RetailInventory.Api.Middleware;
+using RetailInventory.Api.Repositories;
+using RetailInventory.Api.Services;
+using Serilog;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Serilog configuration
+builder.Host.UseSerilog((context, configuration) =>
+{
+    configuration
+        .ReadFrom.Configuration(context.Configuration)
+        .Enrich.FromLogContext()
+        .WriteTo.Console();
+});
 
 // Controllers
 builder.Services.AddControllers();
@@ -84,7 +93,7 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-// JWT
+// JWT Authentication
 var jwtSection = builder.Configuration.GetSection("Jwt");
 var jwtKey = jwtSection["Key"] ?? throw new InvalidOperationException("Jwt:Key is missing");
 
@@ -104,18 +113,30 @@ builder.Services
 
 builder.Services.AddAuthorization();
 
+// Build the app
 var app = builder.Build();
 
+// Serilog request logging
+app.UseSerilogRequestLogging();
+
+// Swagger in development only
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
+// Global exception handling
 app.UseMiddleware<ExceptionMiddleware>();
+
+// Enforce HTTPS
 app.UseHttpsRedirection();
+
+// Authentication & Authorization
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Map controllers
 app.MapControllers();
 
 // Apply migrations automatically (not in Testing)
@@ -150,4 +171,5 @@ using (var scope = app.Services.CreateScope())
     DataSeeder.SeedUsers(db);
 }
 
+// Run the app
 app.Run();

@@ -1,7 +1,7 @@
 services:
   postgres:
     image: postgres:16
-    container_name: retailinventory_postgres
+    container_name: retail_inventory_postgres
     restart: always
     environment:
       POSTGRES_DB: retail_inventory
@@ -16,7 +16,7 @@ services:
     build:
       context: .
       dockerfile: RetailInventory.Api/Dockerfile
-    container_name: retailinventory_api
+    container_name: retail_inventory_api
     depends_on:
       - postgres
     environment:
