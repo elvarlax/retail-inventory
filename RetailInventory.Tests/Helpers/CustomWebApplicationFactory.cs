@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using RetailInventory.Api.Data;
@@ -15,6 +16,19 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
+
+        // Inject JWT config for tests
+        builder.ConfigureAppConfiguration((context, config) =>
+        {
+            var testSettings = new Dictionary<string, string?>
+            {
+                { "Jwt:Key", "THIS_IS_A_TEST_SECRET_KEY_1234567890" },
+                { "Jwt:Issuer", "test-issuer" },
+                { "Jwt:Audience", "test-audience" }
+            };
+
+            config.AddInMemoryCollection(testSettings);
+        });
 
         builder.ConfigureServices(services =>
         {
@@ -32,7 +46,9 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
             using var scope = sp.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<RetailDbContext>();
+
             db.Database.EnsureCreated();
+            DataSeeder.SeedUsers(db);
         });
     }
 
