@@ -1,4 +1,5 @@
-﻿using RetailInventory.Api.DTOs;
+﻿using AutoMapper;
+using RetailInventory.Api.DTOs;
 using RetailInventory.Api.Models;
 using RetailInventory.Api.Repositories;
 
@@ -8,42 +9,16 @@ public class ProductService : IProductService
 {
     private readonly IDummyJsonService _dummyService;
     private readonly IProductRepository _productRepository;
+    private readonly IMapper _mapper;
 
-    public ProductService(IDummyJsonService dummyService, IProductRepository productRepository)
+    public ProductService(
+        IDummyJsonService dummyService,
+        IProductRepository productRepository,
+        IMapper mapper)
     {
         _dummyService = dummyService;
         _productRepository = productRepository;
-    }
-
-    public async Task<List<ProductDto>> GetAllAsync()
-    {
-        var products = await _productRepository.GetAllAsync();
-
-        return products.Select(p => new ProductDto
-        {
-            Id = p.Id,
-            Name = p.Name,
-            SKU = p.SKU,
-            StockQuantity = p.StockQuantity,
-            Price = p.Price
-        }).ToList();
-    }
-
-    public async Task<ProductDto?> GetByIdAsync(Guid id)
-    {
-        var product = await _productRepository.GetByIdAsync(id);
-
-        if (product == null)
-            return null;
-
-        return new ProductDto 
-        {
-            Id = product.Id,
-            Name = product.Name,
-            SKU = product.SKU,
-            StockQuantity = product.StockQuantity,
-            Price = product.Price
-        };
+        _mapper = mapper;
     }
 
     public async Task<int> ImportFromExternalAsync()
@@ -74,5 +49,44 @@ public class ProductService : IProductService
 
         await _productRepository.SaveChangesAsync();
         return inserted;
+    }
+
+    public async Task<List<ProductDto>> GetAllAsync()
+    {
+        var products = await _productRepository.GetAllAsync();
+        return _mapper.Map<List<ProductDto>>(products);
+    }
+
+    public async Task<PagedResultDto<ProductDto>> GetPagedAsync(
+        int pageNumber,
+        int pageSize,
+        string? sortBy,
+        string? sortDirection)
+    {
+        if (pageNumber <= 0) pageNumber = 1;
+        if (pageSize <= 0 || pageSize > 50) pageSize = 10;
+
+        var skip = (pageNumber - 1) * pageSize;
+
+        var totalCount = await _productRepository.CountAsync();
+        var products = await _productRepository.GetPagedAsync(skip, pageSize, sortBy, sortDirection);
+
+        return new PagedResultDto<ProductDto>
+        {
+            Items = _mapper.Map<List<ProductDto>>(products),
+            TotalCount = totalCount,
+            PageNumber = pageNumber,
+            PageSize = pageSize
+        };
+    }
+
+    public async Task<ProductDto?> GetByIdAsync(Guid id)
+    {
+        var product = await _productRepository.GetByIdAsync(id);
+
+        if (product == null)
+            return null;
+
+        return _mapper.Map<ProductDto>(product);
     }
 }

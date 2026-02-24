@@ -9,6 +9,11 @@ public interface IOrderService
     Task CompleteAsync(Guid id);
     Task CancelAsync(Guid id);
     Task<OrderSummaryDto> GetSummaryAsync();
-    Task<PagedResultDto<OrderDto>> GetPagedAsync(int pageNumber, int pageSize, string? status);
+    Task<PagedResultDto<OrderDto>> GetPagedAsync(
+        int pageNumber,
+        int pageSize,
+        string? status,
+        string? sortBy,
+        string? sortDirection);
     Task GenerateRandomOrdersAsync(int count);
 }

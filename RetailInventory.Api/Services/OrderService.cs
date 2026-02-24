@@ -136,7 +136,12 @@ public class OrderService : IOrderService
         return await _orderRepository.GetSummaryAsync();
     }
 
-    public async Task<PagedResultDto<OrderDto>> GetPagedAsync(int pageNumber, int pageSize, string? status)
+    public async Task<PagedResultDto<OrderDto>> GetPagedAsync(
+        int pageNumber,
+        int pageSize,
+        string? status,
+        string? sortBy,
+        string? sortDirection)
     {
         if (pageNumber <= 0) pageNumber = 1;
         if (pageSize <= 0 || pageSize > 50) pageSize = 10;
@@ -154,7 +159,13 @@ public class OrderService : IOrderService
         var skip = (pageNumber - 1) * pageSize;
 
         var totalCount = await _orderRepository.CountAsync(parsedStatus);
-        var orders = await _orderRepository.GetPagedAsync(skip, pageSize, parsedStatus);
+
+        var orders = await _orderRepository.GetPagedAsync(
+            skip,
+            pageSize,
+            parsedStatus,
+            sortBy,
+            sortDirection);
 
         return new PagedResultDto<OrderDto>
         {

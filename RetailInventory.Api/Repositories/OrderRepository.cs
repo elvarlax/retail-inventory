@@ -35,7 +35,12 @@ public class OrderRepository : IOrderRepository
         return await query.CountAsync();
     }
 
-    public async Task<List<Order>> GetPagedAsync(int skip, int take, OrderStatus? status)
+    public async Task<List<Order>> GetPagedAsync(
+        int skip,
+        int take,
+        OrderStatus? status,
+        string? sortBy,
+        string? sortDirection)
     {
         var query = _dbContext.Orders
             .Include(o => o.OrderItems)
@@ -44,8 +49,28 @@ public class OrderRepository : IOrderRepository
         if (status.HasValue)
             query = query.Where(o => o.Status == status);
 
+        var desc = sortDirection?.ToLower() == "desc";
+
+        if (sortBy?.ToLower() == "totalamount")
+        {
+            query = desc
+                ? query.OrderByDescending(o => o.TotalAmount)
+                : query.OrderBy(o => o.TotalAmount);
+        }
+        else if (sortBy?.ToLower() == "status")
+        {
+            query = desc
+                ? query.OrderByDescending(o => o.Status)
+                : query.OrderBy(o => o.Status);
+        }
+        else // default CreatedAt
+        {
+            query = desc
+                ? query.OrderByDescending(o => o.CreatedAt)
+                : query.OrderBy(o => o.CreatedAt);
+        }
+
         return await query
-            .OrderByDescending(o => o.CreatedAt)
             .Skip(skip)
             .Take(take)
             .ToListAsync();
@@ -63,10 +88,14 @@ public class OrderRepository : IOrderRepository
 
     public async Task<OrderSummaryDto> GetSummaryAsync()
     {
-        var totalOrders = await _dbContext.Orders.CountAsync();
-        var pendingOrders = await _dbContext.Orders.CountAsync(o => o.Status == OrderStatus.Pending);
-        var completedOrders = await _dbContext.Orders.CountAsync(o => o.Status == OrderStatus.Completed);
-        var cancelledOrders = await _dbContext.Orders.CountAsync(o => o.Status == OrderStatus.Cancelled);
+        var totalOrders = await _dbContext.Orders
+            .CountAsync();
+        var pendingOrders = await _dbContext.Orders
+            .CountAsync(o => o.Status == OrderStatus.Pending);
+        var completedOrders = await _dbContext.Orders
+            .CountAsync(o => o.Status == OrderStatus.Completed);
+        var cancelledOrders = await _dbContext.Orders
+            .CountAsync(o => o.Status == OrderStatus.Cancelled);
 
         var totalRevenue = await _dbContext.Orders
             .Where(o => o.Status == OrderStatus.Completed)

@@ -1,4 +1,5 @@
-﻿using RetailInventory.Api.DTOs;
+﻿using AutoMapper;
+using RetailInventory.Api.DTOs;
 using RetailInventory.Api.Models;
 using RetailInventory.Api.Repositories;
 
@@ -8,11 +9,16 @@ public class CustomerService : ICustomerService
 {
     private readonly IDummyJsonService _dummyService;
     private readonly ICustomerRepository _customerRepository;
+    private readonly IMapper _mapper;
 
-    public CustomerService(IDummyJsonService dummyService, ICustomerRepository customerRepository)
+    public CustomerService(
+        IDummyJsonService dummyService,
+        ICustomerRepository customerRepository,
+        IMapper mapper)
     {
         _dummyService = dummyService;
         _customerRepository = customerRepository;
+        _mapper = mapper;
     }
 
     public async Task<int> ImportFromExternalAsync()
@@ -48,14 +54,7 @@ public class CustomerService : ICustomerService
     public async Task<List<CustomerDto>> GetAllAsync()
     {
         var customers = await _customerRepository.GetAllAsync();
-
-        return customers.Select(c => new CustomerDto
-        {
-            Id = c.Id,
-            FirstName = c.FirstName,
-            LastName = c.LastName,
-            Email = c.Email
-        }).ToList();
+        return _mapper.Map<List<CustomerDto>>(customers);
     }
 
     public async Task<CustomerDto?> GetByIdAsync(Guid id)
@@ -65,12 +64,29 @@ public class CustomerService : ICustomerService
         if (customer == null)
             return null;
 
-        return new CustomerDto
+        return _mapper.Map<CustomerDto>(customer);
+    }
+
+    public async Task<PagedResultDto<CustomerDto>> GetPagedAsync(
+        int pageNumber,
+        int pageSize,
+        string? sortBy,
+        string? sortDirection)
+    {
+        if (pageNumber <= 0) pageNumber = 1;
+        if (pageSize <= 0 || pageSize > 50) pageSize = 10;
+
+        var skip = (pageNumber - 1) * pageSize;
+
+        var totalCount = await _customerRepository.CountAsync();
+        var customers = await _customerRepository.GetPagedAsync(skip, pageSize, sortBy, sortDirection);
+
+        return new PagedResultDto<CustomerDto>
         {
-            Id = customer.Id,
-            FirstName = customer.FirstName,
-            LastName = customer.LastName,
-            Email = customer.Email
+            Items = _mapper.Map<List<CustomerDto>>(customers),
+            TotalCount = totalCount,
+            PageNumber = pageNumber,
+            PageSize = pageSize
         };
     }
 }

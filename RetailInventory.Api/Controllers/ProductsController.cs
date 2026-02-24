@@ -27,10 +27,18 @@ public class ProductsController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetAllProducts()
+    public async Task<IActionResult> GetPaged(
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 10,
+        [FromQuery] string? sortBy = null,
+        [FromQuery] string? sortDirection = "asc")
     {
-        var products = await _productService.GetAllAsync();
-        return Ok(products);
+        var result = await _productService.GetPagedAsync(
+            pageNumber,
+            pageSize,
+            sortBy,
+            sortDirection);
+        return Ok(result);
     }
 
     [HttpGet("{id}")]

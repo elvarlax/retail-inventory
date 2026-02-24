@@ -25,10 +25,7 @@ public class OrdersController : ControllerBase
             OrderId = orderId
         };
 
-        return CreatedAtAction(
-            nameof(GetById),
-            new { id = orderId },
-            response);
+        return CreatedAtAction(nameof(GetById), new { id = orderId }, response);
     }
 
     [HttpGet("{id}")]
@@ -63,9 +60,16 @@ public class OrdersController : ControllerBase
     public async Task<IActionResult> GetPaged(
         [FromQuery] int pageNumber = 1,
         [FromQuery] int pageSize = 10,
-        [FromQuery] string? status = null)
+        [FromQuery] string? status = null,
+        [FromQuery] string? sortBy = null,
+        [FromQuery] string? sortDirection = "desc")
     {
-        var result = await _orderService.GetPagedAsync(pageNumber, pageSize, status);
+        var result = await _orderService.GetPagedAsync(
+            pageNumber,
+            pageSize,
+            status,
+            sortBy,
+            sortDirection);
         return Ok(result);
     }
 
