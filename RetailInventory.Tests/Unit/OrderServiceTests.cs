@@ -3,7 +3,6 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using RetailInventory.Api.Data;
 using RetailInventory.Api.DTOs;
-using RetailInventory.Api.Exceptions;
 using RetailInventory.Api.Mappings;
 using RetailInventory.Api.Models;
 using RetailInventory.Api.Repositories;
@@ -215,7 +214,7 @@ public class OrderServiceTests
         }
 
         // Act
-        var result = await service.GetPagedAsync(2, 5, null);
+        var result = await service.GetPagedAsync(2, 5, null, null, null);
 
         // Assert
         result.Items.Should().HaveCount(5);
@@ -285,12 +284,85 @@ public class OrderServiceTests
         await service.CompleteAsync(o2);
 
         // Act
-        var result = await service.GetPagedAsync(1, 10, "Completed");
+        var result = await service.GetPagedAsync(1, 10, "Completed", null, null);
 
         // Assert
         result.TotalCount.Should().Be(1);
         result.Items.Should().HaveCount(1);
         result.Items[0].Status.Should().Be("Completed");
+    }
+
+    [Fact]
+    public async Task GetPagedAsync_ShouldRespectSorting_ByTotalAmountAscending()
+    {
+        // Arrange
+        var (db, conn) = TestDbFactory.CreateSqliteInMemoryDb();
+        await using var _ = conn;
+
+        var customer = new Customer
+        {
+            Id = Guid.NewGuid(),
+            ExternalId = 1,
+            FirstName = "Test",
+            LastName = "User",
+            Email = "test@test.com"
+        };
+
+        var product = new Product
+        {
+            Id = Guid.NewGuid(),
+            ExternalId = 1,
+            Name = "Item",
+            SKU = "SKU-1",
+            Price = 10m,
+            StockQuantity = 100
+        };
+
+        db.Customers.Add(customer);
+        db.Products.Add(product);
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db);
+
+        // Create orders with different quantities
+        await service.CreateAsync(new CreateOrderRequest
+        {
+            CustomerId = customer.Id,
+            Items =
+        {
+            new CreateOrderItemRequest
+            {
+                ProductId = product.Id,
+                Quantity = 5   // total = 50
+            }
+        }
+        });
+
+        await service.CreateAsync(new CreateOrderRequest
+        {
+            CustomerId = customer.Id,
+            Items =
+        {
+            new CreateOrderItemRequest
+            {
+                ProductId = product.Id,
+                Quantity = 1   // total = 10
+            }
+        }
+        });
+
+        // Act
+        var result = await service.GetPagedAsync(
+            1,
+            10,
+            null,
+            "totalAmount",
+            "asc");
+
+        // Assert
+        result.Items.Should().HaveCount(2);
+        result.Items[0].TotalAmount.Should().Be(10m);
+        result.Items[1].TotalAmount.Should().Be(50m);
     }
 
     #endregion

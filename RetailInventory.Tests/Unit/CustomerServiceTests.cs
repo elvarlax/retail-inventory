@@ -1,11 +1,13 @@
-﻿using FluentAssertions;
+﻿using AutoMapper;
+using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 using Moq;
 using RetailInventory.Api.Data;
+using RetailInventory.Api.Mappings;
 using RetailInventory.Api.Models;
 using RetailInventory.Api.Repositories;
 using RetailInventory.Api.Services;
 using RetailInventory.Tests.Helpers;
-using Microsoft.EntityFrameworkCore;
 
 namespace RetailInventory.Tests.Unit;
 
@@ -13,10 +15,26 @@ public class CustomerServiceTests
 {
     private readonly Mock<IDummyJsonService> _dummyMock = new();
 
+    private IMapper CreateMapper()
+    {
+        var config = new MapperConfiguration(cfg =>
+        {
+            cfg.AddProfile<MappingProfile>();
+        });
+
+        return config.CreateMapper();
+    }
+
     private CustomerService CreateService(RetailDbContext db)
     {
-        var repository = new CustomerRepository(db);
-        return new CustomerService(_dummyMock.Object, repository);
+        var dummyService = _dummyMock.Object;
+        var customerRepository = new CustomerRepository(db);
+        var mapper = CreateMapper();
+
+        return new CustomerService(
+            dummyService,
+            customerRepository,
+            mapper);
     }
 
     [Fact]
@@ -183,5 +201,53 @@ public class CustomerServiceTests
         customer.FirstName.Should().Be("Alice");
         customer.LastName.Should().Be("Smith");
         customer.Email.Should().Be("alice@test.com");
+    }
+
+    [Fact]
+    public async Task GetPagedAsync_ShouldRespectSorting_ByFirstNameDescending()
+    {
+        // Arrange
+        var (db, conn) = TestDbFactory.CreateSqliteInMemoryDb();
+        await using var _ = conn;
+
+        db.Customers.AddRange(
+            new Customer
+            {
+                Id = Guid.NewGuid(),
+                ExternalId = 1,
+                FirstName = "Anna",
+                LastName = "Z",
+                Email = "a@test.com"
+            },
+            new Customer
+            {
+                Id = Guid.NewGuid(),
+                ExternalId = 2,
+                FirstName = "Bjorn",
+                LastName = "Y",
+                Email = "b@test.com"
+            },
+            new Customer
+            {
+                Id = Guid.NewGuid(),
+                ExternalId = 3,
+                FirstName = "Carl",
+                LastName = "X",
+                Email = "c@test.com"
+            }
+        );
+
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db);
+
+        // Act
+        var result = await service.GetPagedAsync(1, 10, "firstName", "desc");
+
+        // Assert
+        result.Items.Should().HaveCount(3);
+        result.Items[0].FirstName.Should().Be("Carl");
+        result.Items[1].FirstName.Should().Be("Bjorn");
+        result.Items[2].FirstName.Should().Be("Anna");
     }
 }

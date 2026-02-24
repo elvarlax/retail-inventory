@@ -1,7 +1,9 @@
-﻿using FluentAssertions;
+﻿using AutoMapper;
+using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Moq;
 using RetailInventory.Api.Data;
+using RetailInventory.Api.Mappings;
 using RetailInventory.Api.Models;
 using RetailInventory.Api.Repositories;
 using RetailInventory.Api.Services;
@@ -13,10 +15,26 @@ public class ProductServiceTests
 {
     private readonly Mock<IDummyJsonService> _dummyMock = new();
 
+    private IMapper CreateMapper()
+    {
+        var config = new MapperConfiguration(cfg =>
+        {
+            cfg.AddProfile<MappingProfile>();
+        });
+
+        return config.CreateMapper();
+    }
+
     private ProductService CreateService(RetailDbContext db)
     {
-        var repository = new ProductRepository(db);
-        return new ProductService(_dummyMock.Object, repository);
+        var dummyService = _dummyMock.Object;
+        var productRepository = new ProductRepository(db);
+        var mapper = CreateMapper();
+
+        return new ProductService(
+            dummyService,
+            productRepository,
+            mapper);
     }
 
     [Fact]
@@ -183,5 +201,56 @@ public class ProductServiceTests
         product.SKU.Should().Be("DUMMY-10");
         product.StockQuantity.Should().Be(25);
         product.Price.Should().Be(300);
+    }
+
+    [Fact]
+    public async Task GetPagedAsync_ShouldRespectSorting_ByPriceDescending()
+    {
+        // Arrange
+        var (db, conn) = TestDbFactory.CreateSqliteInMemoryDb();
+        await using var _ = conn;
+
+        db.Products.AddRange(
+            new Product
+            {
+                Id = Guid.NewGuid(),
+                ExternalId = 1,
+                Name = "Cheap",
+                SKU = "SKU-1",
+                Price = 10m,
+                StockQuantity = 10
+            },
+            new Product
+            {
+                Id = Guid.NewGuid(),
+                ExternalId = 2,
+                Name = "Mid",
+                SKU = "SKU-2",
+                Price = 50m,
+                StockQuantity = 10
+            },
+            new Product
+            {
+                Id = Guid.NewGuid(),
+                ExternalId = 3,
+                Name = "Expensive",
+                SKU = "SKU-3",
+                Price = 100m,
+                StockQuantity = 10
+            }
+        );
+
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db);
+
+        // Act
+        var result = await service.GetPagedAsync(1, 10, "price", "desc");
+
+        // Assert
+        result.Items.Should().HaveCount(3);
+        result.Items[0].Price.Should().Be(100m);
+        result.Items[1].Price.Should().Be(50m);
+        result.Items[2].Price.Should().Be(10m);
     }
 }
