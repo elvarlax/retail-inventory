@@ -1,9 +1,11 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using RetailInventory.Api.DTOs;
 using RetailInventory.Api.Services;
 
 namespace RetailInventory.Api.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class OrdersController : ControllerBase
@@ -25,7 +27,10 @@ public class OrdersController : ControllerBase
             OrderId = orderId
         };
 
-        return CreatedAtAction(nameof(GetById), new { id = orderId }, response);
+        return CreatedAtAction(
+            nameof(GetById),
+            new { id = orderId },
+            response);
     }
 
     [HttpGet("{id}")]

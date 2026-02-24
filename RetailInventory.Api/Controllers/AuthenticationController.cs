@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using RetailInventory.Api.DTOs;
 using RetailInventory.Api.Repositories;
 using RetailInventory.Api.Services;
@@ -6,13 +7,15 @@ using RetailInventory.Api.Services;
 namespace RetailInventory.Api.Controllers
 {
     [ApiController]
-    [Route("auth")] 
+    [Route("auth")]
     public class AuthenticationController : ControllerBase
     {
         private readonly IUserRepository _userRepository;
         private readonly ITokenService _tokenService;
 
-        public AuthenticationController(IUserRepository userRepository, ITokenService tokenService)
+        public AuthenticationController(
+            IUserRepository userRepository,
+            ITokenService tokenService)
         {
             _userRepository = userRepository;
             _tokenService = tokenService;
@@ -23,6 +26,7 @@ namespace RetailInventory.Api.Controllers
             return Unauthorized(new { message = "Invalid credentials" });
         }
 
+        [AllowAnonymous]
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginRequestDto request)
         {

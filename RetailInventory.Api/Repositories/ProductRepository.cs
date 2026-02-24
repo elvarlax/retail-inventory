@@ -28,7 +28,11 @@ public class ProductRepository : IProductRepository
         return await _dbContext.Products.AsNoTracking().ToListAsync();
     }
 
-    public async Task<List<Product>> GetPagedAsync(int skip, int take, string? sortBy, string? sortDirection)
+    public async Task<List<Product>> GetPagedAsync(
+        int skip,
+        int take,
+        string? sortBy,
+        string? sortDirection)
     {
         var query = _dbContext.Products.AsQueryable();
         var desc = sortDirection?.ToLower() == "desc";

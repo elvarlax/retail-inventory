@@ -3,11 +3,11 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace RetailInventory.Api.Controllers;
 
+[Authorize(Roles = "Admin")]
 [ApiController]
 [Route("admin")]
 public class AdminController : ControllerBase
 {
-    [Authorize(Roles = "Admin")]
     [HttpGet("secret")]
     public IActionResult Secret()
     {

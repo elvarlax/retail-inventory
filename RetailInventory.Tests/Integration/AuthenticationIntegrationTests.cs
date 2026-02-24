@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿using RetailInventory.Api.DTOs;
+using System.Net;
 using System.Net.Http.Json;
 
 namespace RetailInventory.Tests.Integration;
@@ -25,13 +26,11 @@ public class AuthenticationTests : IClassFixture<CustomWebApplicationFactory>
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var content = await response.Content.ReadFromJsonAsync<AuthResponse>();
+        var content = await response.Content.ReadFromJsonAsync<AuthenticationResponseDto>();
 
         Assert.NotNull(content);
         Assert.False(string.IsNullOrWhiteSpace(content!.AccessToken));
     }
-
-    private record AuthResponse(string AccessToken, string TokenType, string Role);
 
     [Fact]
     public async Task AdminEndpoint_WithUserRole_ReturnsForbidden()
@@ -43,7 +42,7 @@ public class AuthenticationTests : IClassFixture<CustomWebApplicationFactory>
             password = "User123!"
         });
 
-        var loginContent = await loginResponse.Content.ReadFromJsonAsync<AuthResponse>();
+        var loginContent = await loginResponse.Content.ReadFromJsonAsync<AuthenticationResponseDto>();
 
         _client.DefaultRequestHeaders.Authorization =
             new System.Net.Http.Headers.AuthenticationHeaderValue(
@@ -65,7 +64,7 @@ public class AuthenticationTests : IClassFixture<CustomWebApplicationFactory>
             password = "Admin123!"
         });
 
-        var loginContent = await loginResponse.Content.ReadFromJsonAsync<AuthResponse>();
+        var loginContent = await loginResponse.Content.ReadFromJsonAsync<AuthenticationResponseDto>();
 
         _client.DefaultRequestHeaders.Authorization =
             new System.Net.Http.Headers.AuthenticationHeaderValue(

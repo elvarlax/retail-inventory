@@ -8,5 +8,5 @@ public class Order
     public decimal TotalAmount { get; set; }
     public DateTime CreatedAt { get; set; }
     public Customer Customer { get; set; } = default!;
-    public List<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
+    public List<OrderItem> OrderItems { get; set; } = new();
 }

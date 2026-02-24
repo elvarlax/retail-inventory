@@ -10,5 +10,9 @@ public interface ICustomerRepository
     Task AddAsync(Customer customer);
     Task SaveChangesAsync();
     Task<int> CountAsync();
-    Task<List<Customer>> GetPagedAsync(int skip, int take, string? sortBy, string? sortDirection);
+    Task<List<Customer>> GetPagedAsync(
+        int skip,
+        int take,
+        string? sortBy,
+        string? sortDirection);
 }

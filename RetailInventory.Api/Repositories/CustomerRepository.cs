@@ -43,7 +43,11 @@ public class CustomerRepository : ICustomerRepository
         return await _dbContext.Customers.CountAsync();
     }
 
-    public async Task<List<Customer>> GetPagedAsync(int skip, int take, string? sortBy, string? sortDirection)
+    public async Task<List<Customer>> GetPagedAsync(
+        int skip,
+        int take,
+        string? sortBy,
+        string? sortDirection)
     {
         var query = _dbContext.Customers.AsQueryable();
         var desc = sortDirection?.ToLower() == "desc";
