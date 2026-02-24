@@ -9,32 +9,19 @@ using RetailInventory.Api.Models;
 
 namespace RetailInventory.Tests.Integration;
 
-public class OrdersIntegrationTests : IClassFixture<CustomWebApplicationFactory>
+public class OrdersIntegrationTests : IntegrationTestBase
 {
-    private readonly CustomWebApplicationFactory _factory;
-    private readonly HttpClient _client;
-
     public OrdersIntegrationTests(CustomWebApplicationFactory factory)
+        : base(factory)
     {
-        _factory = factory;
-        _client = _factory.CreateClient();
-    }
-
-    private void ResetDatabase()
-    {
-        using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<RetailDbContext>();
-
-        db.Database.EnsureDeleted();
-        db.Database.EnsureCreated();
     }
 
     [Fact]
     public async Task GetOrders_ShouldReturnOk()
     {
-        ResetDatabase();
+        var client = await CreateFreshUserClientAsync();
 
-        var response = await _client.GetAsync("/api/orders");
+        var response = await client.GetAsync("/api/orders");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
@@ -42,7 +29,7 @@ public class OrdersIntegrationTests : IClassFixture<CustomWebApplicationFactory>
     [Fact]
     public async Task CreateOrder_ShouldCreateOrder_AndDecreaseStock()
     {
-        ResetDatabase();
+        var client = await CreateFreshUserClientAsync();
 
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<RetailDbContext>();
@@ -83,7 +70,7 @@ public class OrdersIntegrationTests : IClassFixture<CustomWebApplicationFactory>
             }
         };
 
-        var response = await _client.PostAsJsonAsync("/api/orders", request);
+        var response = await client.PostAsJsonAsync("/api/orders", request);
 
         response.StatusCode.Should().Be(HttpStatusCode.Created);
 
@@ -110,7 +97,7 @@ public class OrdersIntegrationTests : IClassFixture<CustomWebApplicationFactory>
     [Fact]
     public async Task GenerateOrders_ShouldCreateRequestedAmount()
     {
-        ResetDatabase();
+        var client = await CreateFreshUserClientAsync();
 
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<RetailDbContext>();
@@ -140,11 +127,14 @@ public class OrdersIntegrationTests : IClassFixture<CustomWebApplicationFactory>
         db.Products.AddRange(products);
         await db.SaveChangesAsync();
 
-        var response = await _client.PostAsJsonAsync("/api/orders/generate", new { count = 5 });
+        var response = await client.PostAsJsonAsync(
+            "/api/orders/generate",
+            new GenerateOrdersRequest { Count = 5 });
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var result = await response.Content.ReadFromJsonAsync<ImportResultResponse>();
+        result.Should().NotBeNull();
         result!.ImportedCount.Should().Be(5);
 
         using var verificationScope = _factory.Services.CreateScope();
