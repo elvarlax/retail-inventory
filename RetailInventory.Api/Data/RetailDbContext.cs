@@ -20,14 +20,12 @@ public class RetailDbContext : DbContext
         modelBuilder.Entity<Product>(entity =>
         {
             entity.ToTable("products");
-            entity.HasIndex(p => p.ExternalId).IsUnique();
             entity.HasIndex(p => p.SKU).IsUnique();
         });
 
         modelBuilder.Entity<Customer>(entity =>
         {
             entity.ToTable("customers");
-            entity.HasIndex(c => c.ExternalId).IsUnique();
             entity.HasIndex(c => c.Email).IsUnique();
         });
 
@@ -36,6 +34,9 @@ public class RetailDbContext : DbContext
             entity.ToTable("orders");
             entity.HasOne(o => o.Customer).WithMany().HasForeignKey(o => o.CustomerId);
             entity.Property(o => o.Status).HasConversion<int>();
+            entity.HasIndex(o => o.Status).IncludeProperties(o => o.TotalAmount);
+            entity.HasIndex(o => o.CreatedAt);
+            entity.HasIndex(o => o.CustomerId);
         });
 
         modelBuilder.Entity<OrderItem>(entity =>
@@ -43,6 +44,7 @@ public class RetailDbContext : DbContext
             entity.ToTable("order_items");
             entity.HasOne(oi => oi.Order).WithMany(o => o.OrderItems).HasForeignKey(oi => oi.OrderId);
             entity.HasOne(oi => oi.Product).WithMany().HasForeignKey(oi => oi.ProductId);
+            entity.HasIndex(oi => oi.OrderId);
         });
 
         modelBuilder.Entity<User>(entity =>

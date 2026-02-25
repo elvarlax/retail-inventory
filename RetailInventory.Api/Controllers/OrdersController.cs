@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RetailInventory.Api.DTOs;
 using RetailInventory.Api.Services;
@@ -76,19 +76,5 @@ public class OrdersController : ControllerBase
             sortBy,
             sortDirection);
         return Ok(result);
-    }
-
-    [HttpPost("generate")]
-    public async Task<IActionResult> GenerateOrders(GenerateOrdersRequest request)
-    {
-        if (request.Count is < 1 or > 1000)
-            return BadRequest("Count must be between 1 and 1000.");
-
-        await _orderService.GenerateRandomOrdersAsync(request.Count);
-
-        return Ok(new ImportResultResponse
-        {
-            ImportedCount = request.Count
-        });
     }
 }

@@ -1,7 +1,5 @@
-﻿using AutoMapper;
+using AutoMapper;
 using FluentAssertions;
-using Microsoft.EntityFrameworkCore;
-using Moq;
 using RetailInventory.Api.Data;
 using RetailInventory.Api.Mappings;
 using RetailInventory.Api.Models;
@@ -13,8 +11,6 @@ namespace RetailInventory.Tests.Unit;
 
 public class ProductServiceTests
 {
-    private readonly Mock<IDummyJsonService> _dummyMock = new();
-
     private IMapper CreateMapper()
     {
         var config = new MapperConfiguration(cfg =>
@@ -27,44 +23,7 @@ public class ProductServiceTests
 
     private ProductService CreateService(RetailDbContext db)
     {
-        var dummyService = _dummyMock.Object;
-        var productRepository = new ProductRepository(db);
-        var mapper = CreateMapper();
-
-        return new ProductService(
-            dummyService,
-            productRepository,
-            mapper);
-    }
-
-    [Fact]
-    public async Task GetAllAsync_ShouldReturnMappedProducts()
-    {
-        // Arrange
-        var (db, conn) = TestDbFactory.CreateSqliteInMemoryDb();
-        await using var _ = conn;
-
-        db.Products.Add(new Product
-        {
-            Id = Guid.NewGuid(),
-            ExternalId = 1,
-            Name = "Phone",
-            SKU = "SKU-1",
-            StockQuantity = 5,
-            Price = 100m
-        });
-
-        await db.SaveChangesAsync();
-
-        var service = CreateService(db);
-
-        // Act
-        var result = await service.GetAllAsync();
-
-        // Assert
-        result.Should().HaveCount(1);
-        result[0].Name.Should().Be("Phone");
-        result[0].Price.Should().Be(100m);
+        return new ProductService(new ProductRepository(db), CreateMapper());
     }
 
     [Fact]
@@ -84,62 +43,6 @@ public class ProductServiceTests
     }
 
     [Fact]
-    public async Task ImportFromExternalAsync_ShouldInsertOnlyNewProducts()
-    {
-        // Arrange
-        var (db, conn) = TestDbFactory.CreateSqliteInMemoryDb();
-        await using var _ = conn;
-
-        db.Products.Add(new Product
-        {
-            Id = Guid.NewGuid(),
-            ExternalId = 2,
-            Name = "Existing",
-            SKU = "SKU-2",
-            StockQuantity = 5,
-            Price = 200m
-        });
-
-        await db.SaveChangesAsync();
-
-        _dummyMock.Setup(d => d.GetProductsAsync())
-            .ReturnsAsync(new List<DummyJsonProduct>
-            {
-                new() { Id = 1, Title = "Phone", Stock = 10, Price = 100 },
-                new() { Id = 2, Title = "Existing", Stock = 5, Price = 200 }
-            });
-
-        var service = CreateService(db);
-
-        // Act
-        var inserted = await service.ImportFromExternalAsync();
-
-        // Assert
-        inserted.Should().Be(1);
-        db.Products.Count().Should().Be(2);
-    }
-
-    [Fact]
-    public async Task ImportFromExternalAsync_ShouldReturnZero_WhenNoProducts()
-    {
-        // Arrange
-        var (db, conn) = TestDbFactory.CreateSqliteInMemoryDb();
-        await using var _ = conn;
-
-        _dummyMock.Setup(d => d.GetProductsAsync())
-            .ReturnsAsync(new List<DummyJsonProduct>());
-
-        var service = CreateService(db);
-
-        // Act
-        var inserted = await service.ImportFromExternalAsync();
-
-        // Assert
-        inserted.Should().Be(0);
-        db.Products.Should().BeEmpty();
-    }
-
-    [Fact]
     public async Task GetByIdAsync_ShouldReturnMappedProduct()
     {
         // Arrange
@@ -149,7 +52,6 @@ public class ProductServiceTests
         var product = new Product
         {
             Id = Guid.NewGuid(),
-            ExternalId = 1,
             Name = "Phone",
             SKU = "SKU-1",
             StockQuantity = 5,
@@ -174,36 +76,6 @@ public class ProductServiceTests
     }
 
     [Fact]
-    public async Task ImportFromExternalAsync_ShouldMapFieldsCorrectly()
-    {
-        // Arrange
-        var (db, conn) = TestDbFactory.CreateSqliteInMemoryDb();
-        await using var _ = conn;
-
-        _dummyMock.Setup(d => d.GetProductsAsync())
-            .ReturnsAsync(new List<DummyJsonProduct>
-            {
-            new() { Id = 10, Title = "Tablet", Stock = 25, Price = 300 }
-            });
-
-        var service = CreateService(db);
-
-        // Act
-        var inserted = await service.ImportFromExternalAsync();
-
-        // Assert
-        inserted.Should().Be(1);
-
-        var product = await db.Products.FirstAsync();
-
-        product.ExternalId.Should().Be(10);
-        product.Name.Should().Be("Tablet");
-        product.SKU.Should().Be("DUMMY-10");
-        product.StockQuantity.Should().Be(25);
-        product.Price.Should().Be(300);
-    }
-
-    [Fact]
     public async Task GetPagedAsync_ShouldRespectSorting_ByPriceDescending()
     {
         // Arrange
@@ -211,33 +83,9 @@ public class ProductServiceTests
         await using var _ = conn;
 
         db.Products.AddRange(
-            new Product
-            {
-                Id = Guid.NewGuid(),
-                ExternalId = 1,
-                Name = "Cheap",
-                SKU = "SKU-1",
-                Price = 10m,
-                StockQuantity = 10
-            },
-            new Product
-            {
-                Id = Guid.NewGuid(),
-                ExternalId = 2,
-                Name = "Mid",
-                SKU = "SKU-2",
-                Price = 50m,
-                StockQuantity = 10
-            },
-            new Product
-            {
-                Id = Guid.NewGuid(),
-                ExternalId = 3,
-                Name = "Expensive",
-                SKU = "SKU-3",
-                Price = 100m,
-                StockQuantity = 10
-            }
+            new Product { Id = Guid.NewGuid(), Name = "Cheap",     SKU = "SKU-1", Price = 10m,  StockQuantity = 10 },
+            new Product { Id = Guid.NewGuid(), Name = "Mid",       SKU = "SKU-2", Price = 50m,  StockQuantity = 10 },
+            new Product { Id = Guid.NewGuid(), Name = "Expensive", SKU = "SKU-3", Price = 100m, StockQuantity = 10 }
         );
 
         await db.SaveChangesAsync();
@@ -252,5 +100,63 @@ public class ProductServiceTests
         result.Items[0].Price.Should().Be(100m);
         result.Items[1].Price.Should().Be(50m);
         result.Items[2].Price.Should().Be(10m);
+    }
+
+    [Fact]
+    public async Task GetPagedAsync_ShouldReturnCorrectPage()
+    {
+        // Arrange
+        var (db, conn) = TestDbFactory.CreateSqliteInMemoryDb();
+        await using var _ = conn;
+
+        for (int i = 0; i < 12; i++)
+            db.Products.Add(new Product
+            {
+                Id = Guid.NewGuid(),
+                Name = $"Product{i:D2}",
+                SKU = $"SKU-{i:D2}",
+                Price = 10m,
+                StockQuantity = 5
+            });
+
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db);
+
+        // Act
+        var result = await service.GetPagedAsync(2, 5, null, null);
+
+        // Assert
+        result.Items.Should().HaveCount(5);
+        result.TotalCount.Should().Be(12);
+        result.PageNumber.Should().Be(2);
+        result.PageSize.Should().Be(5);
+    }
+
+    [Fact]
+    public async Task GetPagedAsync_ShouldRespectSorting_ByStockQuantityAscending()
+    {
+        // Arrange
+        var (db, conn) = TestDbFactory.CreateSqliteInMemoryDb();
+        await using var _ = conn;
+
+        db.Products.AddRange(
+            new Product { Id = Guid.NewGuid(), Name = "High",   SKU = "SKU-1", Price = 10m, StockQuantity = 100 },
+            new Product { Id = Guid.NewGuid(), Name = "Low",    SKU = "SKU-2", Price = 10m, StockQuantity = 5   },
+            new Product { Id = Guid.NewGuid(), Name = "Medium", SKU = "SKU-3", Price = 10m, StockQuantity = 30  }
+        );
+
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db);
+
+        // Act
+        var result = await service.GetPagedAsync(1, 10, "stockQuantity", "asc");
+
+        // Assert
+        result.Items.Should().HaveCount(3);
+        result.Items[0].StockQuantity.Should().Be(5);
+        result.Items[1].StockQuantity.Should().Be(30);
+        result.Items[2].StockQuantity.Should().Be(100);
     }
 }

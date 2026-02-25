@@ -4,15 +4,14 @@ namespace RetailInventory.Api.Repositories;
 
 public interface IProductRepository
 {
-    Task<bool> ExistsByExternalIdAsync(int externalId);
     Task<int> CountAsync();
-    Task<List<Product>> GetAllAsync();
+    Task<Product?> GetByIdAsync(Guid id);
+    Task<List<Product>> GetByIdsAsync(IEnumerable<Guid> ids);
+    Task AddAsync(Product product);
+    Task SaveChangesAsync();
     Task<List<Product>> GetPagedAsync(
         int skip,
         int take,
         string? sortBy,
         string? sortDirection);
-    Task<Product?> GetByIdAsync(Guid id);
-    Task AddAsync(Product product);
-    Task SaveChangesAsync();
 }

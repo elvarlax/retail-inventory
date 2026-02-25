@@ -13,16 +13,6 @@ public class CustomerRepository : ICustomerRepository
         _dbContext = dbContext;
     }
 
-    public async Task<bool> ExistsByExternalIdAsync(int externalId)
-    {
-        return await _dbContext.Customers.AnyAsync(c => c.ExternalId == externalId);
-    }
-
-    public async Task<List<Customer>> GetAllAsync()
-    {
-        return await _dbContext.Customers.AsNoTracking().ToListAsync();
-    }
-
     public async Task<Customer?> GetByIdAsync(Guid id)
     {
         return await _dbContext.Customers.AsNoTracking().FirstOrDefaultAsync(c => c.Id == id);
@@ -49,7 +39,7 @@ public class CustomerRepository : ICustomerRepository
         string? sortBy,
         string? sortDirection)
     {
-        var query = _dbContext.Customers.AsQueryable();
+        var query = _dbContext.Customers.AsNoTracking().AsQueryable();
         var desc = sortDirection?.ToLower() == "desc";
 
         if (sortBy?.ToLower() == "firstname")

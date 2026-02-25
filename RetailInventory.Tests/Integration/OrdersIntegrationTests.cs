@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -37,7 +37,6 @@ public class OrdersIntegrationTests : IntegrationTestBase
         var customer = new Customer
         {
             Id = Guid.NewGuid(),
-            ExternalId = 1,
             FirstName = "Integration",
             LastName = "User",
             Email = "integration@test.com"
@@ -46,7 +45,6 @@ public class OrdersIntegrationTests : IntegrationTestBase
         var product = new Product
         {
             Id = Guid.NewGuid(),
-            ExternalId = 1,
             Name = "IntegrationPhone",
             SKU = "INT-1",
             Price = 100m,
@@ -61,13 +59,9 @@ public class OrdersIntegrationTests : IntegrationTestBase
         {
             CustomerId = customer.Id,
             Items =
-        {
-            new CreateOrderItemRequest
             {
-                ProductId = product.Id,
-                Quantity = 2
+                new CreateOrderItemRequest { ProductId = product.Id, Quantity = 2 }
             }
-        }
         };
 
         var response = await client.PostAsJsonAsync("/api/orders", request);
@@ -90,10 +84,8 @@ public class OrdersIntegrationTests : IntegrationTestBase
             .FirstOrDefaultAsync(o => o.Id == orderId);
 
         order.Should().NotBeNull();
-
         order!.Status.Should().Be(OrderStatus.Pending);
         order.CompletedAt.Should().BeNull();
-
         order.OrderItems.Should().HaveCount(1);
         order.TotalAmount.Should().Be(200m);
     }
@@ -101,7 +93,7 @@ public class OrdersIntegrationTests : IntegrationTestBase
     [Fact]
     public async Task GenerateOrders_ShouldCreateRequestedAmount()
     {
-        var client = await CreateFreshUserClientAsync();
+        var client = await CreateFreshAdminClientAsync();
 
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<RetailDbContext>();
@@ -110,7 +102,6 @@ public class OrdersIntegrationTests : IntegrationTestBase
             .Select(i => new Customer
             {
                 Id = Guid.NewGuid(),
-                ExternalId = i,
                 FirstName = $"User{i}",
                 LastName = "Test",
                 Email = $"user{i}@test.com"
@@ -120,7 +111,6 @@ public class OrdersIntegrationTests : IntegrationTestBase
             .Select(i => new Product
             {
                 Id = Guid.NewGuid(),
-                ExternalId = i,
                 Name = $"Product{i}",
                 SKU = $"SKU-{i}",
                 Price = 10m * i,
@@ -132,14 +122,14 @@ public class OrdersIntegrationTests : IntegrationTestBase
         await db.SaveChangesAsync();
 
         var response = await client.PostAsJsonAsync(
-            "/api/orders/generate",
-            new GenerateOrdersRequest { Count = 5 });
+            "/admin/generate/orders",
+            new GenerateRequest { Count = 5 });
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var result = await response.Content.ReadFromJsonAsync<ImportResultResponse>();
+        var result = await response.Content.ReadFromJsonAsync<GenerateResultResponse>();
         result.Should().NotBeNull();
-        result!.ImportedCount.Should().Be(5);
+        result!.GeneratedCount.Should().Be(5);
 
         using var verificationScope = _factory.Services.CreateScope();
         var verificationDb = verificationScope.ServiceProvider.GetRequiredService<RetailDbContext>();
@@ -147,13 +137,59 @@ public class OrdersIntegrationTests : IntegrationTestBase
         var orders = await verificationDb.Orders.ToListAsync();
 
         orders.Should().HaveCount(5);
-
         orders.Select(o => o.Status)
               .Should()
               .OnlyContain(s =>
                   s == OrderStatus.Pending ||
                   s == OrderStatus.Completed ||
                   s == OrderStatus.Cancelled);
+    }
+
+    [Fact]
+    public async Task CreateOrder_WithZeroQuantity_ShouldReturnBadRequest()
+    {
+        var client = await CreateFreshUserClientAsync();
+
+        var request = new CreateOrderRequest
+        {
+            CustomerId = Guid.NewGuid(),
+            Items =
+            {
+                new CreateOrderItemRequest { ProductId = Guid.NewGuid(), Quantity = 0 }
+            }
+        };
+
+        var response = await client.PostAsJsonAsync("/api/orders", request);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task CreateOrder_WithEmptyItems_ShouldReturnBadRequest()
+    {
+        var client = await CreateFreshUserClientAsync();
+
+        var request = new CreateOrderRequest
+        {
+            CustomerId = Guid.NewGuid(),
+            Items = []
+        };
+
+        var response = await client.PostAsJsonAsync("/api/orders", request);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task GenerateOrders_WithZeroCount_ShouldReturnBadRequest()
+    {
+        var client = await CreateFreshAdminClientAsync();
+
+        var response = await client.PostAsJsonAsync(
+            "/admin/generate/orders",
+            new GenerateRequest { Count = 0 });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
     [Fact]
@@ -167,7 +203,6 @@ public class OrdersIntegrationTests : IntegrationTestBase
         var customer = new Customer
         {
             Id = Guid.NewGuid(),
-            ExternalId = 1,
             FirstName = "Integration",
             LastName = "User",
             Email = "integration@test.com"
@@ -176,7 +211,6 @@ public class OrdersIntegrationTests : IntegrationTestBase
         var product = new Product
         {
             Id = Guid.NewGuid(),
-            ExternalId = 1,
             Name = "IntegrationPhone",
             SKU = "INT-1",
             Price = 100m,
@@ -187,18 +221,13 @@ public class OrdersIntegrationTests : IntegrationTestBase
         db.Products.Add(product);
         await db.SaveChangesAsync();
 
-        // Create order
         var createResponse = await client.PostAsJsonAsync("/api/orders", new CreateOrderRequest
         {
             CustomerId = customer.Id,
             Items =
-        {
-            new CreateOrderItemRequest
             {
-                ProductId = product.Id,
-                Quantity = 2
+                new CreateOrderItemRequest { ProductId = product.Id, Quantity = 2 }
             }
-        }
         });
 
         createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
@@ -206,9 +235,7 @@ public class OrdersIntegrationTests : IntegrationTestBase
         var createResult = await createResponse.Content.ReadFromJsonAsync<CreateOrderResponse>();
         var orderId = createResult!.OrderId;
 
-        // Complete order
         var completeResponse = await client.PostAsync($"/api/orders/{orderId}/complete", null);
-
         completeResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         using var verifyScope = _factory.Services.CreateScope();
@@ -219,7 +246,6 @@ public class OrdersIntegrationTests : IntegrationTestBase
         order.Status.Should().Be(OrderStatus.Completed);
         order.CompletedAt.Should().NotBeNull();
 
-        // Stock should remain deducted (already reduced at create)
         var updatedProduct = await verifyDb.Products.FirstAsync();
         updatedProduct.StockQuantity.Should().Be(8);
     }

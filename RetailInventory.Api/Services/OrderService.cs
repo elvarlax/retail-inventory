@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+using AutoMapper;
 using RetailInventory.Api.DTOs;
 using RetailInventory.Api.Exceptions;
 using RetailInventory.Api.Models;
@@ -39,6 +39,10 @@ public class OrderService : IOrderService
 
         using var transaction = await _orderRepository.BeginTransactionAsync();
 
+        var requestedIds = request.Items.Select(i => i.ProductId).Distinct();
+        var products = await _productRepository.GetByIdsAsync(requestedIds);
+        var productMap = products.ToDictionary(p => p.Id);
+
         decimal total = 0m;
 
         var order = new Order
@@ -54,8 +58,7 @@ public class OrderService : IOrderService
             if (item.Quantity <= 0)
                 throw new BadRequestException("Quantity must be greater than zero.");
 
-            var product = await _productRepository.GetByIdAsync(item.ProductId);
-            if (product == null)
+            if (!productMap.TryGetValue(item.ProductId, out var product))
                 throw new NotFoundException("Product not found.");
 
             if (product.StockQuantity < item.Quantity)
@@ -96,7 +99,7 @@ public class OrderService : IOrderService
 
     public async Task CompleteAsync(Guid id)
     {
-        var order = await _orderRepository.GetByIdAsync(id);
+        var order = await _orderRepository.GetOrderForUpdateAsync(id);
 
         if (order == null)
             throw new NotFoundException("Order not found.");
@@ -120,10 +123,13 @@ public class OrderService : IOrderService
         if (order.Status != OrderStatus.Pending)
             throw new BadRequestException("Only pending orders can be cancelled.");
 
+        var productIds = order.OrderItems.Select(i => i.ProductId).Distinct();
+        var products = await _productRepository.GetByIdsAsync(productIds);
+        var productMap = products.ToDictionary(p => p.Id);
+
         foreach (var item in order.OrderItems)
         {
-            var product = await _productRepository.GetByIdAsync(item.ProductId);
-            if (product != null)
+            if (productMap.TryGetValue(item.ProductId, out var product))
                 product.StockQuantity += item.Quantity;
         }
 
@@ -175,56 +181,5 @@ public class OrderService : IOrderService
             PageNumber = pageNumber,
             PageSize = pageSize
         };
-    }
-
-    public async Task GenerateRandomOrdersAsync(int count)
-    {
-        var customers = await _customerRepository.GetAllAsync();
-        var products = await _productRepository.GetAllAsync();
-
-        if (!customers.Any() || !products.Any())
-            return;
-
-        var random = new Random();
-
-        for (int i = 0; i < count; i++)
-        {
-            var customer = customers[random.Next(customers.Count)];
-            var product = products[random.Next(products.Count)];
-            var quantity = random.Next(1, 4);
-
-            try
-            {
-                var orderId = await CreateAsync(new CreateOrderRequest
-                {
-                    CustomerId = customer.Id,
-                    Items =
-                {
-                    new CreateOrderItemRequest
-                    {
-                        ProductId = product.Id,
-                        Quantity = quantity
-                    }
-                }
-                });
-
-                // Random status distribution
-                var roll = random.Next(1, 101);
-
-                if (roll <= 60)
-                {
-                    await CompleteAsync(orderId);
-                }
-                else if (roll <= 80)
-                {
-                    await CancelAsync(orderId);
-                }
-                // else: keep as Pending
-            }
-            catch
-            {
-                // ignore failures
-            }
-        }
     }
 }

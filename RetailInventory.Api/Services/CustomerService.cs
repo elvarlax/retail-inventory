@@ -1,60 +1,18 @@
-﻿using AutoMapper;
+using AutoMapper;
 using RetailInventory.Api.DTOs;
-using RetailInventory.Api.Models;
 using RetailInventory.Api.Repositories;
 
 namespace RetailInventory.Api.Services;
 
 public class CustomerService : ICustomerService
 {
-    private readonly IDummyJsonService _dummyService;
     private readonly ICustomerRepository _customerRepository;
     private readonly IMapper _mapper;
 
-    public CustomerService(
-        IDummyJsonService dummyService,
-        ICustomerRepository customerRepository,
-        IMapper mapper)
+    public CustomerService(ICustomerRepository customerRepository, IMapper mapper)
     {
-        _dummyService = dummyService;
         _customerRepository = customerRepository;
         _mapper = mapper;
-    }
-
-    public async Task<int> ImportFromExternalAsync()
-    {
-        var users = await _dummyService.GetUsersAsync();
-        var insertedCount = 0;
-
-        foreach (var user in users)
-        {
-            var exists = await _customerRepository.ExistsByExternalIdAsync(user.Id);
-
-            if (exists)
-                continue;
-
-            var customer = new Customer
-            {
-                Id = Guid.NewGuid(),
-                ExternalId = user.Id,
-                FirstName = user.FirstName,
-                LastName = user.LastName,
-                Email = user.Email
-            };
-
-            await _customerRepository.AddAsync(customer);
-            insertedCount++;
-        }
-
-        await _customerRepository.SaveChangesAsync();
-
-        return insertedCount;
-    }
-
-    public async Task<List<CustomerDto>> GetAllAsync()
-    {
-        var customers = await _customerRepository.GetAllAsync();
-        return _mapper.Map<List<CustomerDto>>(customers);
     }
 
     public async Task<CustomerDto?> GetByIdAsync(Guid id)

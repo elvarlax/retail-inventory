@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+using AutoMapper;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using RetailInventory.Api.Data;
@@ -27,17 +27,29 @@ public class OrderServiceTests
 
     private OrderService CreateService(RetailDbContext db)
     {
-        var orderRepository = new OrderRepository(db);
-        var customerRepository = new CustomerRepository(db);
-        var productRepository = new ProductRepository(db);
-        var mapper = CreateMapper();
-
         return new OrderService(
-            orderRepository,
-            customerRepository,
-            productRepository,
-            mapper);
+            new OrderRepository(db),
+            new CustomerRepository(db),
+            new ProductRepository(db),
+            CreateMapper());
     }
+
+    private static Customer MakeCustomer(string email = "test@test.com") => new()
+    {
+        Id = Guid.NewGuid(),
+        FirstName = "Test",
+        LastName = "User",
+        Email = email
+    };
+
+    private static Product MakeProduct(string sku, decimal price, int stock = 10) => new()
+    {
+        Id = Guid.NewGuid(),
+        Name = sku,
+        SKU = sku,
+        Price = price,
+        StockQuantity = stock
+    };
 
     #endregion
 
@@ -50,34 +62,9 @@ public class OrderServiceTests
         var (db, conn) = TestDbFactory.CreateSqliteInMemoryDb();
         await using var _ = conn;
 
-        var customer = new Customer
-        {
-            Id = Guid.NewGuid(),
-            ExternalId = 1,
-            FirstName = "Test",
-            LastName = "User",
-            Email = "test@test.com"
-        };
-
-        var product1 = new Product
-        {
-            Id = Guid.NewGuid(),
-            ExternalId = 1,
-            Name = "Phone",
-            SKU = "SKU-1",
-            Price = 100m,
-            StockQuantity = 10
-        };
-
-        var product2 = new Product
-        {
-            Id = Guid.NewGuid(),
-            ExternalId = 2,
-            Name = "Tablet",
-            SKU = "SKU-2",
-            Price = 200m,
-            StockQuantity = 10
-        };
+        var customer = MakeCustomer();
+        var product1 = MakeProduct("SKU-1", 100m, 10);
+        var product2 = MakeProduct("SKU-2", 200m, 10);
 
         db.Customers.Add(customer);
         db.Products.AddRange(product1, product2);
@@ -105,11 +92,8 @@ public class OrderServiceTests
         order.OrderItems.Should().HaveCount(2);
         order.TotalAmount.Should().Be(2 * 100m + 1 * 200m);
 
-        (await db.Products.FirstAsync(p => p.Id == product1.Id))
-            .StockQuantity.Should().Be(8);
-
-        (await db.Products.FirstAsync(p => p.Id == product2.Id))
-            .StockQuantity.Should().Be(9);
+        (await db.Products.FirstAsync(p => p.Id == product1.Id)).StockQuantity.Should().Be(8);
+        (await db.Products.FirstAsync(p => p.Id == product2.Id)).StockQuantity.Should().Be(9);
     }
 
     #endregion
@@ -123,24 +107,8 @@ public class OrderServiceTests
         var (db, conn) = TestDbFactory.CreateSqliteInMemoryDb();
         await using var _ = conn;
 
-        var customer = new Customer
-        {
-            Id = Guid.NewGuid(),
-            ExternalId = 1,
-            FirstName = "Test",
-            LastName = "User",
-            Email = "test@test.com"
-        };
-
-        var product = new Product
-        {
-            Id = Guid.NewGuid(),
-            ExternalId = 1,
-            Name = "Phone",
-            SKU = "SKU-1",
-            Price = 100m,
-            StockQuantity = 10
-        };
+        var customer = MakeCustomer();
+        var product = MakeProduct("SKU-1", 100m, 10);
 
         db.Customers.Add(customer);
         db.Products.Add(product);
@@ -151,10 +119,7 @@ public class OrderServiceTests
         var orderId = await service.CreateAsync(new CreateOrderRequest
         {
             CustomerId = customer.Id,
-            Items =
-            {
-                new CreateOrderItemRequest { ProductId = product.Id, Quantity = 1 }
-            }
+            Items = { new CreateOrderItemRequest { ProductId = product.Id, Quantity = 1 } }
         });
 
         // Act
@@ -177,24 +142,8 @@ public class OrderServiceTests
         var (db, conn) = TestDbFactory.CreateSqliteInMemoryDb();
         await using var _ = conn;
 
-        var customer = new Customer
-        {
-            Id = Guid.NewGuid(),
-            ExternalId = 1,
-            FirstName = "Test",
-            LastName = "User",
-            Email = "test@test.com"
-        };
-
-        var product = new Product
-        {
-            Id = Guid.NewGuid(),
-            ExternalId = 1,
-            Name = "Phone",
-            SKU = "SKU-1",
-            Price = 100m,
-            StockQuantity = 100
-        };
+        var customer = MakeCustomer();
+        var product = MakeProduct("SKU-1", 100m, 100);
 
         db.Customers.Add(customer);
         db.Products.Add(product);
@@ -207,10 +156,7 @@ public class OrderServiceTests
             await service.CreateAsync(new CreateOrderRequest
             {
                 CustomerId = customer.Id,
-                Items =
-                {
-                    new CreateOrderItemRequest { ProductId = product.Id, Quantity = 1 }
-                }
+                Items = { new CreateOrderItemRequest { ProductId = product.Id, Quantity = 1 } }
             });
         }
 
@@ -230,24 +176,8 @@ public class OrderServiceTests
         var (db, conn) = TestDbFactory.CreateSqliteInMemoryDb();
         await using var _ = conn;
 
-        var customer = new Customer
-        {
-            Id = Guid.NewGuid(),
-            ExternalId = 1,
-            FirstName = "Test",
-            LastName = "User",
-            Email = "test@test.com"
-        };
-
-        var product = new Product
-        {
-            Id = Guid.NewGuid(),
-            ExternalId = 1,
-            Name = "Phone",
-            SKU = "SKU-1",
-            Price = 100m,
-            StockQuantity = 10
-        };
+        var customer = MakeCustomer();
+        var product = MakeProduct("SKU-1", 100m, 10);
 
         db.Customers.Add(customer);
         db.Products.Add(product);
@@ -255,31 +185,16 @@ public class OrderServiceTests
 
         var service = CreateService(db);
 
-        // Create 3 orders
-        var o1 = await service.CreateAsync(new CreateOrderRequest
+        await service.CreateAsync(new CreateOrderRequest
         {
             CustomerId = customer.Id,
-            Items =
-        {
-            new CreateOrderItemRequest
-            {
-                ProductId = product.Id,
-                Quantity = 1
-            }
-        }
+            Items = { new CreateOrderItemRequest { ProductId = product.Id, Quantity = 1 } }
         });
 
         var o2 = await service.CreateAsync(new CreateOrderRequest
         {
             CustomerId = customer.Id,
-            Items =
-        {
-            new CreateOrderItemRequest
-            {
-                ProductId = product.Id,
-                Quantity = 1
-            }
-        }
+            Items = { new CreateOrderItemRequest { ProductId = product.Id, Quantity = 1 } }
         });
 
         await service.CompleteAsync(o2);
@@ -300,24 +215,8 @@ public class OrderServiceTests
         var (db, conn) = TestDbFactory.CreateSqliteInMemoryDb();
         await using var _ = conn;
 
-        var customer = new Customer
-        {
-            Id = Guid.NewGuid(),
-            ExternalId = 1,
-            FirstName = "Test",
-            LastName = "User",
-            Email = "test@test.com"
-        };
-
-        var product = new Product
-        {
-            Id = Guid.NewGuid(),
-            ExternalId = 1,
-            Name = "Item",
-            SKU = "SKU-1",
-            Price = 10m,
-            StockQuantity = 100
-        };
+        var customer = MakeCustomer();
+        var product = MakeProduct("SKU-1", 10m, 100);
 
         db.Customers.Add(customer);
         db.Products.Add(product);
@@ -325,110 +224,25 @@ public class OrderServiceTests
 
         var service = CreateService(db);
 
-        // Create orders with different quantities
         await service.CreateAsync(new CreateOrderRequest
         {
             CustomerId = customer.Id,
-            Items =
-        {
-            new CreateOrderItemRequest
-            {
-                ProductId = product.Id,
-                Quantity = 5   // total = 50
-            }
-        }
+            Items = { new CreateOrderItemRequest { ProductId = product.Id, Quantity = 5 } }  // total = 50
         });
 
         await service.CreateAsync(new CreateOrderRequest
         {
             CustomerId = customer.Id,
-            Items =
-        {
-            new CreateOrderItemRequest
-            {
-                ProductId = product.Id,
-                Quantity = 1   // total = 10
-            }
-        }
+            Items = { new CreateOrderItemRequest { ProductId = product.Id, Quantity = 1 } }  // total = 10
         });
 
         // Act
-        var result = await service.GetPagedAsync(
-            1,
-            10,
-            null,
-            "totalAmount",
-            "asc");
+        var result = await service.GetPagedAsync(1, 10, null, "totalAmount", "asc");
 
         // Assert
         result.Items.Should().HaveCount(2);
         result.Items[0].TotalAmount.Should().Be(10m);
         result.Items[1].TotalAmount.Should().Be(50m);
-    }
-
-    #endregion
-
-    #region GenerateRandomOrders
-
-    [Fact]
-    public async Task GenerateRandomOrdersAsync_ShouldCreateOrders_WhenDataExists()
-    {
-        // Arrange
-        var (db, conn) = TestDbFactory.CreateSqliteInMemoryDb();
-        await using var _ = conn;
-
-        var customers = Enumerable.Range(1, 3)
-            .Select(i => new Customer
-            {
-                Id = Guid.NewGuid(),
-                ExternalId = i,
-                FirstName = $"User{i}",
-                LastName = "Test",
-                Email = $"user{i}@test.com"
-            }).ToList();
-
-        var products = Enumerable.Range(1, 5)
-            .Select(i => new Product
-            {
-                Id = Guid.NewGuid(),
-                ExternalId = i,
-                Name = $"Product{i}",
-                SKU = $"SKU-{i}",
-                Price = 50m * i,
-                StockQuantity = 100
-            }).ToList();
-
-        db.Customers.AddRange(customers);
-        db.Products.AddRange(products);
-        await db.SaveChangesAsync();
-
-        var service = CreateService(db);
-
-        // Act
-        await service.GenerateRandomOrdersAsync(10);
-
-        // Assert
-        var orderCount = await db.Orders.CountAsync();
-        orderCount.Should().Be(10);
-
-        var orders = await db.Orders.Include(o => o.OrderItems).ToListAsync();
-        orders.Should().OnlyContain(o => o.OrderItems.Count > 0);
-    }
-
-    [Fact]
-    public async Task GenerateRandomOrdersAsync_ShouldDoNothing_WhenNoData()
-    {
-        // Arrange
-        var (db, conn) = TestDbFactory.CreateSqliteInMemoryDb();
-        await using var _ = conn;
-
-        var service = CreateService(db);
-
-        // Act
-        await service.GenerateRandomOrdersAsync(5);
-
-        // Assert
-        (await db.Orders.CountAsync()).Should().Be(0);
     }
 
     #endregion

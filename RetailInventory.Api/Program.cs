@@ -36,6 +36,11 @@ builder.Services.AddScoped<ICustomerService, CustomerService>();
 builder.Services.AddScoped<IOrderService, OrderService>();
 builder.Services.AddScoped<ITokenService, JwtTokenService>();
 
+// Data Generators
+builder.Services.AddScoped<CustomerGenerator>();
+builder.Services.AddScoped<ProductGenerator>();
+builder.Services.AddScoped<OrderGenerator>();
+
 // AutoMapper
 builder.Services.AddAutoMapper(typeof(MappingProfile));
 
@@ -49,12 +54,6 @@ if (!builder.Environment.IsEnvironment("Testing"))
                .UseSnakeCaseNamingConvention();
     });
 }
-
-// HTTP Client for DummyJson API
-builder.Services.AddHttpClient<IDummyJsonService, DummyJsonService>(client =>
-{
-    client.BaseAddress = new Uri("https://dummyjson.com/");
-});
 
 // Swagger
 builder.Services.AddEndpointsApiExplorer();

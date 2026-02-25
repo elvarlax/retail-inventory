@@ -54,4 +54,21 @@ public class AuthenticationTests : IntegrationTestBase
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
+
+    [Fact]
+    public async Task Login_WithInvalidEmailFormat_ReturnsBadRequest()
+    {
+        ResetDatabase();
+
+        var client = CreateClient();
+
+        var response = await client.PostAsJsonAsync("/auth/login",
+            new LoginRequestDto
+            {
+                Email = "not-an-email",
+                Password = "Admin123!"
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
 }

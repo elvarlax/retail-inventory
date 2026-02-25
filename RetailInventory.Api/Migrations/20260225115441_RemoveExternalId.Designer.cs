@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using RetailInventory.Api.Data;
@@ -11,9 +12,11 @@ using RetailInventory.Api.Data;
 namespace RetailInventory.Api.Migrations
 {
     [DbContext(typeof(RetailDbContext))]
-    partial class RetailDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260225115441_RemoveExternalId")]
+    partial class RemoveExternalId
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -52,16 +55,8 @@ namespace RetailInventory.Api.Migrations
                     b.HasKey("Id")
                         .HasName("pk_orders");
 
-                    b.HasIndex("CreatedAt")
-                        .HasDatabaseName("ix_orders_created_at");
-
                     b.HasIndex("CustomerId")
                         .HasDatabaseName("ix_orders_customer_id");
-
-                    b.HasIndex("Status")
-                        .HasDatabaseName("ix_orders_status");
-
-                    NpgsqlIndexBuilderExtensions.IncludeProperties(b.HasIndex("Status"), new[] { "TotalAmount" });
 
                     b.ToTable("orders", (string)null);
                 });

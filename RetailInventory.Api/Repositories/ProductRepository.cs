@@ -13,19 +13,9 @@ public class ProductRepository : IProductRepository
         _dbContext = dbContext;
     }
 
-    public async Task<bool> ExistsByExternalIdAsync(int externalId)
-    {
-        return await _dbContext.Products.AnyAsync(p => p.ExternalId == externalId);
-    }
-
     public async Task<int> CountAsync()
     {
         return await _dbContext.Products.CountAsync();
-    }
-
-    public async Task<List<Product>> GetAllAsync()
-    {
-        return await _dbContext.Products.AsNoTracking().ToListAsync();
     }
 
     public async Task<List<Product>> GetPagedAsync(
@@ -63,6 +53,7 @@ public class ProductRepository : IProductRepository
         }
 
         return await query
+            .AsNoTracking()
             .Skip(skip)
             .Take(take)
             .ToListAsync();
@@ -70,7 +61,14 @@ public class ProductRepository : IProductRepository
 
     public async Task<Product?> GetByIdAsync(Guid id)
     {
-        return await _dbContext.Products.FirstOrDefaultAsync(p => p.Id == id);
+        return await _dbContext.Products.AsNoTracking().FirstOrDefaultAsync(p => p.Id == id);
+    }
+
+    public async Task<List<Product>> GetByIdsAsync(IEnumerable<Guid> ids)
+    {
+        return await _dbContext.Products
+            .Where(p => ids.Contains(p.Id))
+            .ToListAsync();
     }
 
     public async Task AddAsync(Product product)

@@ -1,6 +1,5 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using RetailInventory.Api.DTOs;
 using RetailInventory.Api.Services;
 
 namespace RetailInventory.Api.Controllers;
@@ -15,17 +14,6 @@ public class CustomersController : ControllerBase
     public CustomersController(ICustomerService customerService)
     {
         _customerService = customerService;
-    }
-
-    [HttpPost("import")]
-    public async Task<IActionResult> ImportCustomers()
-    {
-        var count = await _customerService.ImportFromExternalAsync();
-
-        return Ok(new ImportResultResponse
-        {
-            ImportedCount = count
-        });
     }
 
     [HttpGet]

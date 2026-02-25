@@ -15,5 +15,4 @@ public interface IOrderService
         string? status,
         string? sortBy,
         string? sortDirection);
-    Task GenerateRandomOrdersAsync(int count);
 }

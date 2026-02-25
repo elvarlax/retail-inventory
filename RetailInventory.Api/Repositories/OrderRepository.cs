@@ -19,9 +19,15 @@ public class OrderRepository : IOrderRepository
     }
 
     public async Task<Order?> GetByIdAsync(Guid id)
-    { 
+    {
         return await _dbContext.Orders
             .Include(o => o.OrderItems)
+            .FirstOrDefaultAsync(o => o.Id == id);
+    }
+
+    public async Task<Order?> GetOrderForUpdateAsync(Guid id)
+    {
+        return await _dbContext.Orders
             .FirstOrDefaultAsync(o => o.Id == id);
     }
 
@@ -43,6 +49,7 @@ public class OrderRepository : IOrderRepository
         string? sortDirection)
     {
         var query = _dbContext.Orders
+            .AsNoTracking()
             .Include(o => o.OrderItems)
             .AsQueryable();
 
@@ -88,31 +95,30 @@ public class OrderRepository : IOrderRepository
 
     public async Task<OrderSummaryDto> GetSummaryAsync()
     {
-        var totalOrders = await _dbContext.Orders
-            .CountAsync();
-        var pendingOrders = await _dbContext.Orders
-            .CountAsync(o => o.Status == OrderStatus.Pending);
-        var completedOrders = await _dbContext.Orders
-            .CountAsync(o => o.Status == OrderStatus.Completed);
-        var cancelledOrders = await _dbContext.Orders
-            .CountAsync(o => o.Status == OrderStatus.Cancelled);
+        var grouped = await _dbContext.Orders
+            .GroupBy(o => o.Status)
+            .Select(g => new
+            {
+                Status = g.Key,
+                Count = g.Count(),
+                Revenue = g.Sum(o => o.TotalAmount)
+            })
+            .ToListAsync();
 
-        var totalRevenue = await _dbContext.Orders
-            .Where(o => o.Status == OrderStatus.Completed)
-            .SumAsync(o => o.TotalAmount);
+        var byStatus = grouped.ToDictionary(g => g.Status);
 
-        var pendingRevenue = await _dbContext.Orders
-            .Where(o => o.Status == OrderStatus.Pending)
-            .SumAsync(o => o.TotalAmount);
+        var pending   = byStatus.GetValueOrDefault(OrderStatus.Pending);
+        var completed = byStatus.GetValueOrDefault(OrderStatus.Completed);
+        var cancelled = byStatus.GetValueOrDefault(OrderStatus.Cancelled);
 
         return new OrderSummaryDto
         {
-            TotalOrders = totalOrders,
-            PendingOrders = pendingOrders,
-            CompletedOrders = completedOrders,
-            CancelledOrders = cancelledOrders,
-            TotalRevenue = totalRevenue,
-            PendingRevenue = pendingRevenue
+            TotalOrders     = grouped.Sum(g => g.Count),
+            PendingOrders   = pending?.Count     ?? 0,
+            CompletedOrders = completed?.Count   ?? 0,
+            CancelledOrders = cancelled?.Count   ?? 0,
+            TotalRevenue    = completed?.Revenue ?? 0m,
+            PendingRevenue  = pending?.Revenue   ?? 0m
         };
     }
 }

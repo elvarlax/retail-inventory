@@ -37,6 +37,13 @@ The API uses JWT Bearer authentication.
 -   Protected endpoints via `[Authorize]` attributes
 -   Swagger integration with JWT support
 
+Default seeded credentials:
+
+| Role  | Email         | Password  |
+|-------|---------------|-----------|
+| Admin | admin@local   | Admin123! |
+| User  | user@local    | User123!  |
+
 Example:
 
 POST /auth/login
@@ -51,8 +58,7 @@ GET /admin/secret
 
 ### Products
 
--   Import products from DummyJSON external API
--   Unique constraints on `ExternalId` and `SKU`
+-   Unique constraint on `SKU`
 -   DTO projection via AutoMapper
 -   Pagination and sorting support
 
@@ -60,14 +66,12 @@ Endpoints:
 
 -   GET /api/products
 -   GET /api/products/{id}
--   POST /api/products/import
 
 ------------------------------------------------------------------------
 
 ### Customers
 
--   Import users from DummyJSON external API
--   Unique constraints on `ExternalId` and `Email`
+-   Unique constraint on `Email`
 -   DTO projection via AutoMapper
 -   Pagination and sorting support
 
@@ -75,7 +79,6 @@ Endpoints:
 
 -   GET /api/customers
 -   GET /api/customers/{id}
--   POST /api/customers/import
 
 ------------------------------------------------------------------------
 
@@ -90,8 +93,7 @@ Implemented behavior:
 -   Stock restoration on cancel
 -   Controlled state transitions (Pending → Completed / Cancelled)
 -   Revenue aggregation via summary endpoint
--   Paginated and filtered order retrieval
--   Random order generation for simulation/demo
+-   Paginated, filtered, and sorted order retrieval
 
 Endpoints:
 
@@ -101,7 +103,25 @@ Endpoints:
 -   POST /api/orders/{id}/cancel
 -   GET /api/orders
 -   GET /api/orders/summary
--   POST /api/orders/generate
+
+------------------------------------------------------------------------
+
+### Admin Data Generation
+
+High-volume test data generation using **Bogus**. Generators bypass the
+service layer and write directly to the database in batches with
+`AutoDetectChangesEnabled` disabled for performance.
+
+-   Customers: realistic names and unique emails
+-   Products: category-prefixed SKUs, randomized prices and stock
+-   Orders: 60% Completed / 20% Cancelled / 20% Pending, dates spread
+    over 12 months, correct `TotalAmount` computed from items
+
+Endpoints (Admin role required):
+
+-   POST /admin/generate/customers
+-   POST /admin/generate/products
+-   POST /admin/generate/orders
 
 ------------------------------------------------------------------------
 
@@ -112,6 +132,8 @@ Orders support:
 -   pageNumber
 -   pageSize (capped at 50)
 -   status filter (Pending, Completed, Cancelled)
+-   sortBy (createdAt, totalAmount, status)
+-   sortDirection (asc / desc)
 
 Products and Customers support:
 
@@ -148,6 +170,17 @@ Order creation is wrapped in a database transaction to ensure:
 
 ------------------------------------------------------------------------
 
+## Performance
+
+-   N+1 queries eliminated via batch `WHERE id IN (...)` on product lookups
+-   Order summary uses a single `GROUP BY` aggregation query
+-   Covering index on `orders(status) INCLUDE (total_amount)` for summary
+-   Indexes on `orders.created_at`, `orders.customer_id`, and
+    `order_items.order_id` for pagination and JOIN performance
+-   `AsNoTracking` on all read-only repository queries
+
+------------------------------------------------------------------------
+
 ## Testing Strategy
 
 ### Unit Tests
@@ -155,7 +188,8 @@ Order creation is wrapped in a database transaction to ensure:
 -   SQLite in-memory relational provider
 -   Business rule validation
 -   State transition enforcement
--   Edge case coverage
+-   Pagination and sorting coverage
+-   Data generator correctness (count, uniqueness, field integrity)
 
 ### Integration Tests
 
@@ -191,11 +225,26 @@ http://localhost:8080/swagger
 -   PostgreSQL (Npgsql)
 -   SQLite (Testing)
 -   AutoMapper
+-   Bogus
 -   Serilog
 -   xUnit
 -   FluentAssertions
 -   Docker & Docker Compose
 -   GitHub Actions (CI)
+
+------------------------------------------------------------------------
+
+## Input Validation
+
+Request DTOs use Data Annotations validated automatically by `[ApiController]`:
+
+-   `POST /auth/login` — email format enforced via `[EmailAddress]`
+-   `POST /api/orders` — item quantity must be ≥ 1 via `[Range]`
+-   `POST /admin/generate/*` — count must be between 1 and 100000 via `[Range]`
+
+Invalid requests return `400 Bad Request` before reaching the service layer.
+Business rule violations (insufficient stock, invalid state transitions) are enforced in
+the service layer and surfaced via `BadRequestException`.
 
 ------------------------------------------------------------------------
 
@@ -207,3 +256,4 @@ http://localhost:8080/swagger
 -   DTOs separate API contracts from persistence models
 -   Tests validate both domain rules and HTTP boundaries
 -   Infrastructure is environment-aware (PostgreSQL vs SQLite)
+-   Read-only queries use `AsNoTracking` to reduce EF Core overhead
