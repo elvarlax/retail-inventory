@@ -13,12 +13,13 @@ public class RetailDbContextFactory : IDesignTimeDbContextFactory<RetailDbContex
             .AddEnvironmentVariables()
             .Build();
 
-        var connectionString = configuration["ConnectionStrings__DefaultConnection"];
+        var connectionString = configuration.GetConnectionString("DefaultConnection");
 
+        // Validate the connection string
         if (string.IsNullOrWhiteSpace(connectionString))
         {
             throw new InvalidOperationException(
-                "Connection string 'ConnectionStrings__DefaultConnection' was not found."
+                "Connection string 'DefaultConnection' was not found."
             );
         }
 
