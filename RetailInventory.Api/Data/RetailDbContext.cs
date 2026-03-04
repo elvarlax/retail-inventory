@@ -14,6 +14,7 @@ public class RetailDbContext : DbContext
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
     public DbSet<User> Users => Set<User>();
+    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -51,6 +52,18 @@ public class RetailDbContext : DbContext
         {
             entity.ToTable("users");
             entity.HasIndex(u => u.Email).IsUnique();
+        });
+
+        modelBuilder.Entity<OutboxMessage>(entity =>
+        {
+            entity.ToTable("outbox_messages");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Type).IsRequired().HasMaxLength(200);
+            entity.Property(x => x.Source).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.Payload).IsRequired().HasColumnType("jsonb");
+            entity.Property(x => x.OccurredAtUtc).IsRequired();
+            entity.Property(x => x.PublishedAtUtc);
+            entity.HasIndex(x => x.PublishedAtUtc);
         });
     }
 }

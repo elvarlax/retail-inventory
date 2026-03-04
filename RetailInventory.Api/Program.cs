@@ -34,13 +34,14 @@ builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddScoped<ICustomerService, CustomerService>();
 builder.Services.AddScoped<IOrderService, OrderService>();
+builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<ITokenService, JwtTokenService>();
-builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
+builder.Services.AddScoped<ISeedService, SeedService>();
 
-// Data Generators
-builder.Services.AddScoped<CustomerGenerator>();
-builder.Services.AddScoped<ProductGenerator>();
-builder.Services.AddScoped<OrderGenerator>();
+// Background Services
+if (!builder.Environment.IsEnvironment("Testing"))
+    builder.Services.AddHostedService<OutboxPublisher>();
 
 // AutoMapper
 builder.Services.AddAutoMapper(typeof(MappingProfile));
@@ -108,8 +109,8 @@ builder.Services
             ValidateIssuerSigningKey = true,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
             ValidateLifetime = true,
-            ValidateIssuer = false,
-            ValidateAudience = false,
+            ValidateIssuer = builder.Environment.IsProduction(),
+            ValidateAudience = builder.Environment.IsProduction(),
         };
     });
 
@@ -150,11 +151,11 @@ if (!app.Environment.IsEnvironment("Testing"))
     try
     {
         db.Database.Migrate();
-        Console.WriteLine("Database migrated successfully.");
+        Log.Information("Database migrated successfully.");
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"Migration failed: {ex}");
+        Log.Error(ex, "Database migration failed");
         throw;
     }
 }

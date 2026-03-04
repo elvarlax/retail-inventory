@@ -11,6 +11,7 @@ public interface IOrderRepository
     Task SaveChangesAsync();
     Task<IDbContextTransaction> BeginTransactionAsync();
     Task<OrderSummaryDto> GetSummaryAsync();
+    Task<OutboxMessage> AddOutboxMessageAsync(OutboxMessage message);
     Task<List<Order>> GetPagedAsync(
         int skip,
         int take,

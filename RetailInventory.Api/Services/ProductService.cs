@@ -1,6 +1,9 @@
 using AutoMapper;
 using RetailInventory.Api.DTOs;
+using RetailInventory.Api.Events;
+using RetailInventory.Api.Models;
 using RetailInventory.Api.Repositories;
+using System.Text.Json;
 
 namespace RetailInventory.Api.Services;
 
@@ -13,6 +16,46 @@ public class ProductService : IProductService
     {
         _productRepository = productRepository;
         _mapper = mapper;
+    }
+
+    public async Task<Guid> CreateAsync(CreateProductRequest request)
+    {
+        var product = new Product
+        {
+            Id = Guid.NewGuid(),
+            Name = request.Name,
+            SKU = request.SKU,
+            Price = request.Price,
+            StockQuantity = request.StockQuantity
+        };
+
+        await _productRepository.AddAsync(product);
+
+        var occurredAt = DateTime.UtcNow;
+
+        var productCreatedEvent = new ProductCreatedV1
+        {
+            EventId = Guid.NewGuid(),
+            OccurredAtUtc = occurredAt,
+            ProductId = product.Id,
+            Name = product.Name,
+            SKU = product.SKU,
+            Price = product.Price,
+            StockQuantity = product.StockQuantity
+        };
+
+        await _productRepository.AddOutboxMessageAsync(new OutboxMessage
+        {
+            Id = productCreatedEvent.EventId,
+            Type = nameof(ProductCreatedV1),
+            Source = OutboxConstants.Source,
+            Payload = JsonSerializer.Serialize(productCreatedEvent),
+            OccurredAtUtc = occurredAt
+        });
+
+        await _productRepository.SaveChangesAsync();
+
+        return product.Id;
     }
 
     public async Task<PagedResultDto<ProductDto>> GetPagedAsync(

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using RetailInventory.Api.DTOs;
 using RetailInventory.Api.Services;
 
 namespace RetailInventory.Api.Controllers;
@@ -14,6 +15,17 @@ public class ProductsController : ControllerBase
     public ProductsController(IProductService productService)
     {
         _productService = productService;
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> Create(CreateProductRequest request)
+    {
+        var id = await _productService.CreateAsync(request);
+
+        return CreatedAtAction(
+            nameof(GetById),
+            new { id },
+            null);
     }
 
     [HttpGet]

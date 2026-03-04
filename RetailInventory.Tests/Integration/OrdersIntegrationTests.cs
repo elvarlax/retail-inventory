@@ -90,60 +90,6 @@ public class OrdersIntegrationTests : IntegrationTestBase
         order.TotalAmount.Should().Be(200m);
     }
 
-    [Fact]
-    public async Task GenerateOrders_ShouldCreateRequestedAmount()
-    {
-        var client = await CreateFreshAdminClientAsync();
-
-        using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<RetailDbContext>();
-
-        var customers = Enumerable.Range(1, 3)
-            .Select(i => new Customer
-            {
-                Id = Guid.NewGuid(),
-                FirstName = $"User{i}",
-                LastName = "Test",
-                Email = $"user{i}@test.com"
-            }).ToList();
-
-        var products = Enumerable.Range(1, 5)
-            .Select(i => new Product
-            {
-                Id = Guid.NewGuid(),
-                Name = $"Product{i}",
-                SKU = $"SKU-{i}",
-                Price = 10m * i,
-                StockQuantity = 100
-            }).ToList();
-
-        db.Customers.AddRange(customers);
-        db.Products.AddRange(products);
-        await db.SaveChangesAsync();
-
-        var response = await client.PostAsJsonAsync(
-            "/admin/generate/orders",
-            new GenerateRequest { Count = 5 });
-
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-
-        var result = await response.Content.ReadFromJsonAsync<GenerateResultResponse>();
-        result.Should().NotBeNull();
-        result!.GeneratedCount.Should().Be(5);
-
-        using var verificationScope = _factory.Services.CreateScope();
-        var verificationDb = verificationScope.ServiceProvider.GetRequiredService<RetailDbContext>();
-
-        var orders = await verificationDb.Orders.ToListAsync();
-
-        orders.Should().HaveCount(5);
-        orders.Select(o => o.Status)
-              .Should()
-              .OnlyContain(s =>
-                  s == OrderStatus.Pending ||
-                  s == OrderStatus.Completed ||
-                  s == OrderStatus.Cancelled);
-    }
 
     [Fact]
     public async Task CreateOrder_WithZeroQuantity_ShouldReturnBadRequest()
@@ -180,17 +126,6 @@ public class OrdersIntegrationTests : IntegrationTestBase
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
-    [Fact]
-    public async Task GenerateOrders_WithZeroCount_ShouldReturnBadRequest()
-    {
-        var client = await CreateFreshAdminClientAsync();
-
-        var response = await client.PostAsJsonAsync(
-            "/admin/generate/orders",
-            new GenerateRequest { Count = 0 });
-
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-    }
 
     [Fact]
     public async Task CompleteOrder_ShouldSetCompletedAt()

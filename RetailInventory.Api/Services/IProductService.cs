@@ -4,6 +4,7 @@ namespace RetailInventory.Api.Services;
 
 public interface IProductService
 {
+    Task<Guid> CreateAsync(CreateProductRequest request);
     Task<ProductDto?> GetByIdAsync(Guid id);
     Task<PagedResultDto<ProductDto>> GetPagedAsync(
         int pageNumber,

@@ -1,8 +1,10 @@
 using AutoMapper;
 using RetailInventory.Api.DTOs;
+using RetailInventory.Api.Events;
 using RetailInventory.Api.Exceptions;
 using RetailInventory.Api.Models;
 using RetailInventory.Api.Repositories;
+using System.Text.Json;
 
 namespace RetailInventory.Api.Services;
 
@@ -43,6 +45,7 @@ public class OrderService : IOrderService
         var products = await _productRepository.GetByIdsAsync(requestedIds);
         var productMap = products.ToDictionary(p => p.Id);
 
+        var occurredAt = DateTime.UtcNow;
         decimal total = 0m;
 
         var order = new Order
@@ -50,8 +53,10 @@ public class OrderService : IOrderService
             Id = Guid.NewGuid(),
             CustomerId = request.CustomerId,
             Status = OrderStatus.Pending,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = occurredAt
         };
+
+        var itemSnapshots = new List<OrderItemSnapshot>();
 
         foreach (var item in request.Items)
         {
@@ -75,13 +80,39 @@ public class OrderService : IOrderService
             });
 
             total += product.Price * item.Quantity;
+
+            itemSnapshots.Add(new OrderItemSnapshot
+            {
+                ProductId = product.Id,
+                Quantity = item.Quantity,
+                UnitPrice = product.Price
+            });
         }
 
         order.TotalAmount = total;
 
         await _orderRepository.AddAsync(order);
-        await _orderRepository.SaveChangesAsync();
 
+        var orderPlacedEvent = new OrderPlacedV1
+        {
+            EventId = Guid.NewGuid(),
+            OccurredAtUtc = occurredAt,
+            OrderId = order.Id,
+            CustomerId = order.CustomerId,
+            TotalAmount = order.TotalAmount,
+            Items = itemSnapshots
+        };
+
+        await _orderRepository.AddOutboxMessageAsync(new OutboxMessage
+        {
+            Id = orderPlacedEvent.EventId,
+            Type = nameof(OrderPlacedV1),
+            Source = OutboxConstants.Source,
+            Payload = JsonSerializer.Serialize(orderPlacedEvent),
+            OccurredAtUtc = occurredAt
+        });
+
+        await _orderRepository.SaveChangesAsync();
         await transaction.CommitAsync();
 
         return order.Id;
@@ -107,8 +138,28 @@ public class OrderService : IOrderService
         if (order.Status != OrderStatus.Pending)
             throw new BadRequestException("Only pending orders can be completed.");
 
+        var occurredAt = DateTime.UtcNow;
+
         order.Status = OrderStatus.Completed;
-        order.CompletedAt = DateTime.UtcNow;
+        order.CompletedAt = occurredAt;
+
+        var statusEvent = new OrderStatusChangedV1
+        {
+            EventId = Guid.NewGuid(),
+            OccurredAtUtc = occurredAt,
+            OrderId = order.Id,
+            PreviousStatus = nameof(OrderStatus.Pending),
+            NewStatus = nameof(OrderStatus.Completed)
+        };
+
+        await _orderRepository.AddOutboxMessageAsync(new OutboxMessage
+        {
+            Id = statusEvent.EventId,
+            Type = nameof(OrderStatusChangedV1),
+            Source = OutboxConstants.Source,
+            Payload = JsonSerializer.Serialize(statusEvent),
+            OccurredAtUtc = occurredAt
+        });
 
         await _orderRepository.SaveChangesAsync();
     }
@@ -134,6 +185,26 @@ public class OrderService : IOrderService
         }
 
         order.Status = OrderStatus.Cancelled;
+
+        var occurredAt = DateTime.UtcNow;
+
+        var statusEvent = new OrderStatusChangedV1
+        {
+            EventId = Guid.NewGuid(),
+            OccurredAtUtc = occurredAt,
+            OrderId = order.Id,
+            PreviousStatus = nameof(OrderStatus.Pending),
+            NewStatus = nameof(OrderStatus.Cancelled)
+        };
+
+        await _orderRepository.AddOutboxMessageAsync(new OutboxMessage
+        {
+            Id = statusEvent.EventId,
+            Type = nameof(OrderStatusChangedV1),
+            Source = OutboxConstants.Source,
+            Payload = JsonSerializer.Serialize(statusEvent),
+            OccurredAtUtc = occurredAt
+        });
 
         await _orderRepository.SaveChangesAsync();
     }

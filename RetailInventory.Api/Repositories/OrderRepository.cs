@@ -93,6 +93,12 @@ public class OrderRepository : IOrderRepository
         return await _dbContext.Database.BeginTransactionAsync();
     }
 
+    public Task<OutboxMessage> AddOutboxMessageAsync(OutboxMessage message)
+    {
+        _dbContext.OutboxMessages.Add(message);
+        return Task.FromResult(message);
+    }
+
     public async Task<OrderSummaryDto> GetSummaryAsync()
     {
         var grouped = await _dbContext.Orders

@@ -33,6 +33,12 @@ public class CustomerRepository : ICustomerRepository
         return await _dbContext.Customers.CountAsync();
     }
 
+    public Task<OutboxMessage> AddOutboxMessageAsync(OutboxMessage message)
+    {
+        _dbContext.OutboxMessages.Add(message);
+        return Task.FromResult(message);
+    }
+
     public async Task<List<Customer>> GetPagedAsync(
         int skip,
         int take,

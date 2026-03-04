@@ -8,6 +8,7 @@ public interface ICustomerRepository
     Task AddAsync(Customer customer);
     Task SaveChangesAsync();
     Task<int> CountAsync();
+    Task<OutboxMessage> AddOutboxMessageAsync(OutboxMessage message);
     Task<List<Customer>> GetPagedAsync(
         int skip,
         int take,

@@ -15,12 +15,10 @@ public class RetailDbContextFactory : IDesignTimeDbContextFactory<RetailDbContex
 
         var connectionString = configuration.GetConnectionString("DefaultConnection");
 
-        // Validate the connection string
+        // fallback for design-time migrations
         if (string.IsNullOrWhiteSpace(connectionString))
         {
-            throw new InvalidOperationException(
-                "Connection string 'DefaultConnection' was not found."
-            );
+            connectionString = "Host=localhost;Port=5433;Database=retail_inventory;Username=postgres;Password=postgres";
         }
 
         var optionsBuilder = new DbContextOptionsBuilder<RetailDbContext>();

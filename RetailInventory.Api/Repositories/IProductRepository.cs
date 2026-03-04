@@ -9,6 +9,7 @@ public interface IProductRepository
     Task<List<Product>> GetByIdsAsync(IEnumerable<Guid> ids);
     Task AddAsync(Product product);
     Task SaveChangesAsync();
+    Task<OutboxMessage> AddOutboxMessageAsync(OutboxMessage message);
     Task<List<Product>> GetPagedAsync(
         int skip,
         int take,

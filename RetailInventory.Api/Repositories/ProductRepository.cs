@@ -76,6 +76,12 @@ public class ProductRepository : IProductRepository
         await _dbContext.Products.AddAsync(product);
     }
 
+    public Task<OutboxMessage> AddOutboxMessageAsync(OutboxMessage message)
+    {
+        _dbContext.OutboxMessages.Add(message);
+        return Task.FromResult(message);
+    }
+
     public async Task SaveChangesAsync()
     {
         await _dbContext.SaveChangesAsync();

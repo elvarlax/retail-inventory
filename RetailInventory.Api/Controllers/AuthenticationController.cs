@@ -9,9 +9,9 @@ namespace RetailInventory.Api.Controllers
     [Route("auth")]
     public class AuthenticationController : ControllerBase
     {
-        private readonly IAuthService _authService;
+        private readonly IAuthenticationService _authService;
 
-        public AuthenticationController(IAuthService authService)
+        public AuthenticationController(IAuthenticationService authService)
         {
             _authService = authService;
         }

@@ -1,6 +1,9 @@
 using AutoMapper;
 using RetailInventory.Api.DTOs;
+using RetailInventory.Api.Events;
+using RetailInventory.Api.Models;
 using RetailInventory.Api.Repositories;
+using System.Text.Json;
 
 namespace RetailInventory.Api.Services;
 
@@ -13,6 +16,45 @@ public class CustomerService : ICustomerService
     {
         _customerRepository = customerRepository;
         _mapper = mapper;
+    }
+
+    public async Task<Customer> CreateAsync(RegisterRequestDto request)
+    {
+        var customer = new Customer
+        {
+            Id = Guid.NewGuid(),
+            FirstName = request.FirstName,
+            LastName = request.LastName,
+            Email = request.Email
+        };
+
+        await _customerRepository.AddAsync(customer);
+
+        // Create event
+        var occurredAt = DateTime.UtcNow;
+
+        var customerCreatedEvent = new CustomerCreatedV1
+        {
+            EventId = Guid.NewGuid(),
+            OccurredAtUtc = occurredAt,
+            CustomerId = customer.Id,
+            FirstName = customer.FirstName,
+            LastName = customer.LastName,
+            Email = customer.Email
+        };
+
+        await _customerRepository.AddOutboxMessageAsync(new OutboxMessage
+        {
+            Id = customerCreatedEvent.EventId,
+            Type = nameof(CustomerCreatedV1),
+            Source = OutboxConstants.Source,
+            Payload = JsonSerializer.Serialize(customerCreatedEvent),
+            OccurredAtUtc = occurredAt
+        });
+
+        await _customerRepository.SaveChangesAsync();
+
+        return customer;
     }
 
     public async Task<CustomerDto?> GetByIdAsync(Guid id)
