@@ -24,6 +24,24 @@ public static class DataSeeder
             }
         );
 
+        // Create matching Customer records so the seeded accounts can place orders.
+        dbContext.Customers.AddRange(
+            new Customer
+            {
+                Id = Guid.NewGuid(),
+                FirstName = "Admin",
+                LastName = "User",
+                Email = "admin@local"
+            },
+            new Customer
+            {
+                Id = Guid.NewGuid(),
+                FirstName = "Regular",
+                LastName = "User",
+                Email = "user@local"
+            }
+        );
+
         dbContext.SaveChanges();
     }
 }

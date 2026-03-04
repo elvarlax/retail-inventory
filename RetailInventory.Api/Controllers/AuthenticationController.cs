@@ -1,7 +1,6 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RetailInventory.Api.DTOs;
-using RetailInventory.Api.Repositories;
 using RetailInventory.Api.Services;
 
 namespace RetailInventory.Api.Controllers
@@ -10,45 +9,30 @@ namespace RetailInventory.Api.Controllers
     [Route("auth")]
     public class AuthenticationController : ControllerBase
     {
-        private readonly IUserRepository _userRepository;
-        private readonly ITokenService _tokenService;
+        private readonly IAuthService _authService;
 
-        public AuthenticationController(
-            IUserRepository userRepository,
-            ITokenService tokenService)
+        public AuthenticationController(IAuthService authService)
         {
-            _userRepository = userRepository;
-            _tokenService = tokenService;
-        }
-
-        private IActionResult InvalidCredentials()
-        {
-            return Unauthorized(new { message = "Invalid credentials" });
+            _authService = authService;
         }
 
         [AllowAnonymous]
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginRequestDto request)
         {
-            var user = await _userRepository.GetByEmailAsync(request.Email);
+            var response = await _authService.LoginAsync(request);
 
-            if (user == null)
-                return InvalidCredentials();
+            if (response == null)
+                return Unauthorized(new { message = "Invalid credentials" });
 
-            var valid = BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash);
+            return Ok(response);
+        }
 
-            if (!valid)
-                return InvalidCredentials();
-
-            var token = _tokenService.CreateToken(user);
-
-            var response = new AuthenticationResponseDto
-            {
-                AccessToken = token,
-                TokenType = "Bearer",
-                Role = user.Role
-            };
-
+        [AllowAnonymous]
+        [HttpPost("register")]
+        public async Task<IActionResult> Register([FromBody] RegisterRequestDto request)
+        {
+            var response = await _authService.RegisterAsync(request);
             return Ok(response);
         }
     }
