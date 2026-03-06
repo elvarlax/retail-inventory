@@ -9,10 +9,3 @@ public class OrderPlacedV1
     public decimal TotalAmount { get; set; }
     public List<OrderItemSnapshot> Items { get; set; } = [];
 }
-
-public class OrderItemSnapshot
-{
-    public Guid ProductId { get; set; }
-    public int Quantity { get; set; }
-    public decimal UnitPrice { get; set; }
-}
