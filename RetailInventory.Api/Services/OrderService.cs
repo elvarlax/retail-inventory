@@ -219,7 +219,8 @@ public class OrderService : IOrderService
         int pageSize,
         string? status,
         string? sortBy,
-        string? sortDirection)
+        string? sortDirection,
+        Guid? customerId = null)
     {
         if (pageNumber <= 0) pageNumber = 1;
         if (pageSize <= 0 || pageSize > 50) pageSize = 10;
@@ -236,14 +237,15 @@ public class OrderService : IOrderService
 
         var skip = (pageNumber - 1) * pageSize;
 
-        var totalCount = await _orderRepository.CountAsync(parsedStatus);
+        var totalCount = await _orderRepository.CountAsync(parsedStatus, customerId);
 
         var orders = await _orderRepository.GetPagedAsync(
             skip,
             pageSize,
             parsedStatus,
             sortBy,
-            sortDirection);
+            sortDirection,
+            customerId);
 
         return new PagedResultDto<OrderDto>
         {

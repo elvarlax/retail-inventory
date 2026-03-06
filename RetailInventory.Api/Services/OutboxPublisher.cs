@@ -55,16 +55,19 @@ public class OutboxPublisher : BackgroundService
                     continue;
                 }
 
-                // Build all Service Bus messages up front, then send as a single batch.
-                // The SDK handles splitting at the 256KB limit automatically.
-                var sbMessages = messages
-                    .Select(m => new ServiceBusMessage(m.Payload)
+                var sbMessages = new List<ServiceBusMessage>();
+
+                foreach (var message in messages)
+                {
+                    var sbMessage = new ServiceBusMessage(message.Payload)
                     {
-                        // MessageId enables Service Bus duplicate detection if enabled on the topic
-                        MessageId = m.Id.ToString(),
-                        Subject = m.Type
-                    })
-                    .ToList();
+                        MessageId = message.Id.ToString(),
+                        Subject = message.Type
+                    };
+
+                    sbMessage.ApplicationProperties["source"] = message.Source;
+                    sbMessages.Add(sbMessage);
+                }
 
                 await _sender.SendMessagesAsync(sbMessages, stoppingToken);
 

@@ -1,4 +1,4 @@
-﻿namespace RetailInventory.Api.DTOs;
+namespace RetailInventory.Api.DTOs;
 
 public class AuthenticationResponseDto
 {

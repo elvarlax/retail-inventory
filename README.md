@@ -8,154 +8,232 @@ The project demonstrates layered architecture, event-driven design via the trans
 
 ---
 
-## Architecture
+# Architecture
 
-**Controller → Service → Repository → DbContext → Database**
+## Application Layers
 
-- Controllers handle HTTP concerns only (routing, status codes, request/response shaping)
-- Services encapsulate domain logic and enforce business invariants
-- Repositories abstract query and persistence logic
-- Entity Framework Core manages database access and migrations
-- PostgreSQL is used for runtime; SQLite (in-memory) is used for automated testing
+Controller → Service → Repository → DbContext → PostgreSQL
+
+* Controllers handle HTTP concerns only (routing, status codes, request/response shaping)
+* Services encapsulate domain logic and enforce business invariants
+* Repositories abstract query and persistence logic
+* Entity Framework Core manages database access and migrations
+* PostgreSQL stores operational data
+
+SQLite (in-memory) is used during automated tests to provide a fast relational test environment.
 
 ---
 
-## Event-Driven Architecture — Transactional Outbox Pattern
+## System Architecture
 
-Every domain mutation writes an event to an `outbox_messages` table in the **same database transaction** as the state change. A background service (`OutboxPublisher`) polls the table and publishes unpublished messages to an **Azure Service Bus topic**.
+The service also acts as an **event producer** in a broader event-driven data platform architecture.
 
-**Pipeline:**
+```mermaid
+flowchart LR
+
+Client[Client / Frontend]
+API[ASP.NET Core API]
+DB[(PostgreSQL OLTP)]
+Bus[(Azure Service Bus retail.events)]
+Analytics[retail-analytics]
+
+Client --> API
+API --> DB
+DB -- OutboxPublisher --> Bus
+Bus --> Analytics
+```
+
+This architecture enables reliable event-driven integration with downstream systems without requiring distributed transactions.
+
+Events produced by this service are consumed by the **retail-analytics** project to build an analytics warehouse.
+
+---
+
+# Event-Driven Architecture — Transactional Outbox Pattern
+
+Every domain mutation writes an event to an `outbox_messages` table in the **same database transaction** as the state change.
+
+A background service (`OutboxPublisher`) polls the table and publishes unpublished messages to an **Azure Service Bus topic**.
+
+### Event Pipeline
 
 ```
-API → PostgreSQL (outbox_messages) → OutboxPublisher → Azure Service Bus topic
+API
+ ↓
+PostgreSQL (outbox_messages)
+ ↓
+OutboxPublisher
+ ↓
+Azure Service Bus Topic
+ ↓
+retail-analytics consumer
+ ↓
+events.retail_events
+ ↓
+dbt transformations
+ ↓
+analytics tables
 ```
 
-**Events emitted:**
+---
 
-| Event | Trigger |
-|-------|---------|
-| `CustomerCreatedV1` | `POST /auth/register` or seed |
-| `ProductCreatedV1` | `POST /api/products` or seed |
-| `OrderPlacedV1` | `POST /api/orders` |
+## Events Emitted
+
+| Event                  | Trigger                                       |
+| ---------------------- | --------------------------------------------- |
+| `CustomerCreatedV1`    | `POST /auth/register` or seed                 |
+| `ProductCreatedV1`     | `POST /api/products` or seed                  |
+| `OrderPlacedV1`        | `POST /api/orders`                            |
 | `OrderStatusChangedV1` | `POST /api/orders/{id}/complete` or `/cancel` |
 
-**`OutboxPublisher` behaviour:**
+---
 
-- Polls every 3 seconds for unpublished messages
-- Sends batches of up to 20 messages per cycle
-- Exponential backoff on failure (5s × attempt, capped at 60s)
-- `published_at_utc` is stamped only after a confirmed send
+## OutboxPublisher Behaviour
 
-**Local setup** uses the [Azure Service Bus Emulator](https://learn.microsoft.com/en-us/azure/service-bus-messaging/test-locally-with-service-bus-emulator) running in Docker alongside the API.
+* Polls every **3 seconds** for unpublished messages
+* Sends **batches of up to 20 messages**
+* **Exponential backoff** on failure (5s × attempt, capped at 60s)
+* `published_at_utc` is stamped only after confirmed send
+
+Local development uses the **Azure Service Bus Emulator** running inside Docker.
 
 ---
 
-## Authentication & Authorization
+# Authentication & Authorization
 
-The API uses JWT Bearer authentication.
+The API uses **JWT Bearer authentication**.
 
-- Token-based authentication using a symmetric signing key
-- Role-based authorization (Admin / User)
-- Protected endpoints via `[Authorize]` and `[Authorize(Roles = "Admin")]`
-- Swagger UI with JWT support
+* Token-based authentication using a symmetric signing key
+* Role-based authorization (Admin / User)
+* Protected endpoints via `[Authorize]`
+* Swagger UI with JWT support
 
-Default seeded credentials:
+### Default Seeded Credentials
 
 | Role  | Email       | Password  |
-|-------|-------------|-----------|
+| ----- | ----------- | --------- |
 | Admin | admin@local | Admin123! |
 | User  | user@local  | User123!  |
 
 Endpoints:
 
-- `POST /auth/login` — returns a JWT
-- `POST /auth/register` — creates a user + customer profile, emits `CustomerCreatedV1`
+```
+POST /auth/login
+POST /auth/register
+```
+
+Register also emits `CustomerCreatedV1`.
 
 ---
 
-## Domain Overview
+# Domain Overview
 
-### Products
+## Products
 
-- Unique constraint on `SKU`
-- DTO projection via AutoMapper
-- Pagination and sorting support
-- Emits `ProductCreatedV1` on creation
+* Unique constraint on `SKU`
+* DTO projection via AutoMapper
+* Pagination and sorting support
+* Emits `ProductCreatedV1`
 
 Endpoints:
 
-- `POST /api/products`
-- `GET /api/products`
-- `GET /api/products/{id}`
+```
+POST /api/products
+GET /api/products
+GET /api/products/{id}
+```
 
 ---
 
-### Customers
+## Customers
 
-- Unique constraint on `Email`
-- DTO projection via AutoMapper
-- Pagination and sorting support
-- Customer profile is created automatically on registration
+* Unique constraint on `Email`
+* DTO projection via AutoMapper
+* Pagination and sorting support
 
 Endpoints:
 
-- `GET /api/customers`
-- `GET /api/customers/{id}`
+```
+GET /api/customers
+GET /api/customers/{id}
+```
 
 ---
 
-### Orders
+## Orders
 
-The order aggregate contains the core business logic.
+The **Order aggregate** contains the core business logic.
 
-Implemented behaviour:
+Features:
 
-- Transactional order creation (order + stock deduction + outbox event in one transaction)
-- Stock restoration on cancel
-- Controlled state transitions: `Pending → Completed` or `Pending → Cancelled`
-- Revenue aggregation via summary endpoint
-- Paginated, filtered, and sorted order retrieval
-- Emits `OrderPlacedV1` on creation and `OrderStatusChangedV1` on status change
+* Transactional order creation
+* Stock deduction during order placement
+* Stock restoration on cancel
+* State transitions
+
+```
+Pending → Completed
+Pending → Cancelled
+```
+
+Events emitted:
+
+* `OrderPlacedV1`
+* `OrderStatusChangedV1`
 
 Endpoints:
 
-- `POST /api/orders`
-- `GET /api/orders`
-- `GET /api/orders/{id}`
-- `GET /api/orders/summary`
-- `POST /api/orders/{id}/complete`
-- `POST /api/orders/{id}/cancel`
+```
+POST /api/orders
+GET /api/orders
+GET /api/orders/{id}
+GET /api/orders/summary
+POST /api/orders/{id}/complete
+POST /api/orders/{id}/cancel
+```
 
 ---
 
-### Admin — Data Seeding
+# Admin — Data Seeding
 
-Generates realistic test data using **Bogus**, routing through the full service layer so every created entity also emits its corresponding outbox event.
+Generates realistic test data using **Bogus**.
 
-- Customers with realistic names and unique emails → `CustomerCreatedV1` per customer
-- Products with category-prefixed SKUs, randomised prices and stock → `ProductCreatedV1` per product
-- Orders with 1–3 items each, distributed ~60% Completed / 20% Cancelled / 20% Pending → `OrderPlacedV1` + `OrderStatusChangedV1` per order
+Events emitted during seeding:
 
-Endpoint (Admin role required):
+* `CustomerCreatedV1`
+* `ProductCreatedV1`
+* `OrderPlacedV1`
+* `OrderStatusChangedV1`
 
-- `POST /admin/seed` — body: `{ "customers": 10, "products": 10, "orders": 20 }`
+Endpoint:
 
-Each count is independently configurable. Response includes counts of entities created and total events emitted.
+```
+POST /admin/seed
+```
+
+Example body:
+
+```
+{
+  "customers": 1000,
+  "products": 1000,
+  "orders": 5000
+}
+```
 
 ---
 
-## Pagination, Filtering & Sorting
+# Pagination, Filtering & Sorting
 
 Orders support:
 
-- `pageNumber`, `pageSize` (capped at 50)
-- `status` filter (`Pending`, `Completed`, `Cancelled`)
-- `sortBy` (`createdAt`, `totalAmount`, `status`)
-- `sortDirection` (`asc` / `desc`)
+* `pageNumber`
+* `pageSize`
+* `status`
+* `sortBy`
+* `sortDirection`
 
-Products and Customers support `pageNumber`, `pageSize`, `sortBy`, `sortDirection`.
-
-Examples:
+Example:
 
 ```
 GET /api/orders?pageNumber=1&pageSize=10&status=Completed
@@ -164,147 +242,152 @@ GET /api/products?pageNumber=1&pageSize=10&sortBy=price&sortDirection=desc
 
 ---
 
-## Structured Logging
+# Structured Logging
 
-The API uses **Serilog** for structured logging with environment-aware configuration and Serilog request logging middleware.
+Uses **Serilog** with:
 
----
-
-## Transaction Handling
-
-Order creation is wrapped in a database transaction that atomically covers:
-
-- Stock deduction across all ordered products
-- Order and order items persistence
-- Outbox message insertion
-
-All succeed together or nothing is committed.
+* structured logs
+* request logging middleware
+* environment-based configuration
 
 ---
 
-## Performance
+# Transaction Handling
 
-- N+1 queries eliminated via batch `WHERE id IN (...)` on product lookups
-- Order summary uses a single `GROUP BY` aggregation query
-- Covering index on `orders(status) INCLUDE (total_amount)` for summary
-- Indexes on `orders.created_at`, `orders.customer_id`, `order_items.order_id` for pagination and JOIN performance
-- `AsNoTracking()` on all read-only repository queries
-- Index on `outbox_messages.published_at_utc` for efficient unpublished message polling
+Order creation is wrapped in a database transaction covering:
 
----
+* Stock deduction
+* Order persistence
+* Order items persistence
+* Outbox event insertion
 
-## Testing Strategy
-
-### Unit Tests
-
-- SQLite in-memory relational provider
-- Business rule validation
-- State transition enforcement
-- Pagination and sorting coverage
-
-### Integration Tests
-
-- `WebApplicationFactory` with full HTTP pipeline
-- Fresh database per test for deterministic isolation
-- Verification via separate `DbContext` scopes
-- **Outbox tests** verify that each domain operation writes the correct event type, source, and payload to `outbox_messages`
+All succeed together or none are committed.
 
 ---
 
-## Running Locally
+# Performance
+
+* Eliminates N+1 queries
+* Batch product lookups
+* Indexed query paths
+* `AsNoTracking()` on read queries
+* Indexed `outbox_messages.published_at_utc`
+
+---
+
+# Testing Strategy
+
+## Unit Tests
+
+* SQLite in-memory provider
+* Domain rule validation
+* Pagination coverage
+
+## Integration Tests
+
+* `WebApplicationFactory`
+* Full HTTP pipeline
+* Isolated database per test
+* Outbox event verification
+
+---
+
+# Running Locally
 
 ### Prerequisites
 
-- Docker & Docker Compose
-- .NET 10 SDK (for running tests outside Docker)
+* Docker
+* Docker Compose
+* .NET 10 SDK
 
-### Start the full stack
+---
 
-```bash
+## Start the Stack
+
+```
 docker-compose up --build -d
 ```
 
-Swagger UI is available at [http://localhost:8080/swagger](http://localhost:8080/swagger) once the api container is healthy.
+Swagger:
 
-### Seed test data (Admin token required)
-
-```bash
-# 1. Login
-curl -s -X POST http://localhost:8080/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"admin@local","password":"Admin123!"}' | jq .
-
-# 2. Seed
-curl -s -X POST http://localhost:8080/admin/seed \
-  -H "Authorization: Bearer <token>" \
-  -H "Content-Type: application/json" \
-  -d '{"customers": 50, "products": 100, "orders": 500}' | jq .
+```
+http://localhost:8080/swagger
 ```
 
-### Run tests
+---
 
-```bash
+## Seed Data
+
+```
+POST /admin/seed
+```
+
+---
+
+## Run Tests
+
+```
 dotnet test
 ```
 
 ---
 
-## Docker
+# Docker
 
-Run the full stack (API + PostgreSQL + Azure Service Bus Emulator + SQL Edge):
+Runs:
 
-```bash
-docker-compose up --build
-```
+* API
+* PostgreSQL
+* Azure Service Bus Emulator
+* SQL Edge
 
 Startup order:
-1. `sqledge` starts and becomes healthy (SQL Edge is the storage backend for the Service Bus emulator)
-2. `servicebus` starts once sqledge is healthy
-3. `postgres` starts independently
-4. `api` starts once both `postgres` and `servicebus` are started
 
-Swagger UI: [http://localhost:8080/swagger](http://localhost:8080/swagger)
-
----
-
-## Tech Stack
-
-- .NET 10
-- ASP.NET Core Web API
-- Entity Framework Core + EFCore.NamingConventions
-- PostgreSQL (Npgsql)
-- Azure Service Bus (`Azure.Messaging.ServiceBus`)
-- Azure Service Bus Emulator (local development)
-- SQLite (testing)
-- AutoMapper
-- Bogus
-- BCrypt.Net
-- Serilog
-- xUnit + FluentAssertions
-- Docker & Docker Compose
-- GitHub Actions (CI)
+1. `sqledge`
+2. `servicebus`
+3. `postgres`
+4. `api`
 
 ---
 
-## Input Validation
+# Tech Stack
 
-Request DTOs use Data Annotations validated by `[ApiController]` before reaching the service layer:
-
-- `POST /auth/login` — `[EmailAddress]` on email, `[Required]` on password
-- `POST /api/orders` — `[Range(1, int.MaxValue)]` on item quantity
-- `POST /admin/seed` — `[Range(1, 1000)]` on customers/products, `[Range(1, 5000)]` on orders
-
-Business rule violations (insufficient stock, invalid state transitions, duplicate email) are enforced in the service layer and surfaced via structured exception middleware.
+* .NET 10
+* ASP\.NET Core Web API
+* Entity Framework Core
+* PostgreSQL (Npgsql)
+* Azure Service Bus
+* Azure Service Bus Emulator
+* SQLite (testing)
+* AutoMapper
+* Bogus
+* BCrypt\.Net
+* Serilog
+* xUnit + FluentAssertions
+* Docker
+* GitHub Actions
 
 ---
 
-## Design Principles
+# Input Validation
 
-- Business logic lives in services, not controllers
-- Repositories isolate data access concerns
-- Transactions protect aggregate invariants
-- Outbox pattern guarantees at-least-once event delivery without distributed transactions
-- DTOs decouple API contracts from persistence models
-- Tests validate both domain rules and HTTP boundaries
-- Infrastructure is environment-aware (PostgreSQL vs SQLite, Service Bus vs disabled)
-- Read-only queries use `AsNoTracking()` to reduce EF Core overhead
+DTO validation via `[ApiController]`.
+
+Examples:
+
+* Email validation on login
+* Quantity validation on order items
+* Seed limits on admin endpoint
+
+---
+
+# Design Principles
+
+* Business logic lives in services
+* Repositories isolate persistence
+* Transactions protect aggregate invariants
+* Outbox ensures reliable event publishing
+* DTOs decouple API contracts
+* Tests validate both domain rules and HTTP behaviour
+* Infrastructure adapts to environment
+* Read queries use `AsNoTracking()` for efficiency

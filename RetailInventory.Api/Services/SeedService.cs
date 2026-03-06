@@ -50,6 +50,7 @@ public class SeedService : ISeedService
             {
                 Name = faker.Commerce.ProductName(),
                 SKU = $"{faker.PickRandom(Categories)}-{Guid.NewGuid().ToString("N")[..8].ToUpper()}",
+                ImageUrl = faker.Image.PicsumUrl(640, 480),
                 Price = Math.Round(faker.Random.Decimal(1m, 500m), 2),
                 StockQuantity = orders * 10
             });

@@ -7,6 +7,7 @@ public interface ICustomerService
 {
     Task<Customer> CreateAsync(RegisterRequestDto request);
     Task<CustomerDto?> GetByIdAsync(Guid id);
+    Task<CustomerDto?> GetByEmailAsync(string email);
     Task<PagedResultDto<CustomerDto>> GetPagedAsync(
         int pageNumber,
         int pageSize,

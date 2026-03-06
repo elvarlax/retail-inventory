@@ -1,8 +1,8 @@
-﻿using RetailInventory.Api.Models;
+using RetailInventory.Api.Models;
 
 namespace RetailInventory.Api.Services;
 
 public interface ITokenService
 {
-    string CreateToken(User user);
+    string CreateToken(User user, Guid? customerId = null);
 }

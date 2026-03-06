@@ -1,4 +1,4 @@
-﻿using RetailInventory.Api.DTOs;
+using RetailInventory.Api.DTOs;
 
 namespace RetailInventory.Api.Services;
 
@@ -14,5 +14,6 @@ public interface IOrderService
         int pageSize,
         string? status,
         string? sortBy,
-        string? sortDirection);
+        string? sortDirection,
+        Guid? customerId = null);
 }

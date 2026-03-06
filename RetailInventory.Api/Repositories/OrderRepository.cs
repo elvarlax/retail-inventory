@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using RetailInventory.Api.Data;
 using RetailInventory.Api.DTOs;
@@ -31,12 +31,15 @@ public class OrderRepository : IOrderRepository
             .FirstOrDefaultAsync(o => o.Id == id);
     }
 
-    public async Task<int> CountAsync(OrderStatus? status)
+    public async Task<int> CountAsync(OrderStatus? status, Guid? customerId = null)
     {
         var query = _dbContext.Orders.AsQueryable();
 
         if (status.HasValue)
             query = query.Where(o => o.Status == status);
+
+        if (customerId.HasValue)
+            query = query.Where(o => o.CustomerId == customerId);
 
         return await query.CountAsync();
     }
@@ -46,7 +49,8 @@ public class OrderRepository : IOrderRepository
         int take,
         OrderStatus? status,
         string? sortBy,
-        string? sortDirection)
+        string? sortDirection,
+        Guid? customerId = null)
     {
         var query = _dbContext.Orders
             .AsNoTracking()
@@ -55,6 +59,9 @@ public class OrderRepository : IOrderRepository
 
         if (status.HasValue)
             query = query.Where(o => o.Status == status);
+
+        if (customerId.HasValue)
+            query = query.Where(o => o.CustomerId == customerId);
 
         var desc = sortDirection?.ToLower() == "desc";
 

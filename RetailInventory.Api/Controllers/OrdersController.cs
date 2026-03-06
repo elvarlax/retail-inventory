@@ -67,14 +67,16 @@ public class OrdersController : ControllerBase
         [FromQuery] int pageSize = 10,
         [FromQuery] string? status = null,
         [FromQuery] string? sortBy = null,
-        [FromQuery] string? sortDirection = "desc")
+        [FromQuery] string? sortDirection = "desc",
+        [FromQuery] Guid? customerId = null)
     {
         var result = await _orderService.GetPagedAsync(
             pageNumber,
             pageSize,
             status,
             sortBy,
-            sortDirection);
+            sortDirection,
+            customerId);
         return Ok(result);
     }
 }

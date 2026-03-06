@@ -18,6 +18,12 @@ public class CustomerRepository : ICustomerRepository
         return await _dbContext.Customers.AsNoTracking().FirstOrDefaultAsync(c => c.Id == id);
     }
 
+    public async Task<Customer?> GetByEmailAsync(string email)
+    {
+        return await _dbContext.Customers.AsNoTracking()
+            .FirstOrDefaultAsync(c => c.Email.ToLower() == email.ToLower());
+    }
+
     public async Task AddAsync(Customer customer)
     {
         await _dbContext.Customers.AddAsync(customer);

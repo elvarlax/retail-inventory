@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.EntityFrameworkCore.Storage;
 using RetailInventory.Api.DTOs;
 using RetailInventory.Api.Models;
 
@@ -7,7 +7,7 @@ public interface IOrderRepository
     Task AddAsync(Order order);
     Task<Order?> GetByIdAsync(Guid id);
     Task<Order?> GetOrderForUpdateAsync(Guid id);
-    Task<int> CountAsync(OrderStatus? status);
+    Task<int> CountAsync(OrderStatus? status, Guid? customerId = null);
     Task SaveChangesAsync();
     Task<IDbContextTransaction> BeginTransactionAsync();
     Task<OrderSummaryDto> GetSummaryAsync();
@@ -17,5 +17,6 @@ public interface IOrderRepository
         int take,
         OrderStatus? status,
         string? sortBy,
-        string? sortDirection);
+        string? sortDirection,
+        Guid? customerId = null);
 }

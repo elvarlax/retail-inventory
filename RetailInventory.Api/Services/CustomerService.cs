@@ -67,6 +67,16 @@ public class CustomerService : ICustomerService
         return _mapper.Map<CustomerDto>(customer);
     }
 
+    public async Task<CustomerDto?> GetByEmailAsync(string email)
+    {
+        var customer = await _customerRepository.GetByEmailAsync(email);
+
+        if (customer == null)
+            return null;
+
+        return _mapper.Map<CustomerDto>(customer);
+    }
+
     public async Task<PagedResultDto<CustomerDto>> GetPagedAsync(
         int pageNumber,
         int pageSize,

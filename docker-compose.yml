@@ -45,6 +45,7 @@ services:
       - "9354:9354"
     volumes:
       - ./servicebus-config.json:/ServiceBus_Emulator/ConfigFiles/Config.json
+
   api:
     build:
       context: .
@@ -59,11 +60,9 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=retail_inventory;Username=postgres;Password=postgres
-
       ServiceBus__ConnectionString: Endpoint=sb://servicebus;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE=;UseDevelopmentEmulator=true;
       ServiceBus__TopicName: retail.events
       ServiceBus__SubscriptionName: analytics-sub
-
     ports:
       - "8080:8080"
 

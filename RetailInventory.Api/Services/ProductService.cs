@@ -25,6 +25,7 @@ public class ProductService : IProductService
             Id = Guid.NewGuid(),
             Name = request.Name,
             SKU = request.SKU,
+            ImageUrl = request.ImageUrl,
             Price = request.Price,
             StockQuantity = request.StockQuantity
         };
@@ -40,6 +41,7 @@ public class ProductService : IProductService
             ProductId = product.Id,
             Name = product.Name,
             SKU = product.SKU,
+            ImageUrl = product.ImageUrl,
             Price = product.Price,
             StockQuantity = product.StockQuantity
         };
