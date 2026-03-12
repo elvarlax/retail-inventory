@@ -11,6 +11,7 @@ publish/
 # Visual Studio
 #####################################
 
+.dotnet/
 .vs/
 *.user
 *.suo
