@@ -1,0 +1,555 @@
+{
+  "info": {
+    "name": "Retail Inventory API",
+    "description": "Complete API collection for the Retail Inventory service. Set `baseUrl` to your running instance (default: http://localhost:8080). Login first — the token is automatically stored in the `token` variable.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Login (Admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var data = pm.response.json();",
+                  "if (data.accessToken) {",
+                  "    pm.collectionVariables.set('token', data.accessToken);",
+                  "    console.log('Token stored');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@local\",\n  \"password\": \"Admin123!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Login as Admin. Token is automatically stored in the `token` collection variable."
+          }
+        },
+        {
+          "name": "Login (User)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var data = pm.response.json();",
+                  "if (data.accessToken) {",
+                  "    pm.collectionVariables.set('token', data.accessToken);",
+                  "    console.log('Token stored');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@local\",\n  \"password\": \"User123!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Login as standard User."
+          }
+        },
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Jane\",\n  \"lastName\": \"Doe\",\n  \"email\": \"jane.doe@example.com\",\n  \"password\": \"Password123!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "register"]
+            },
+            "description": "Register a new user. Creates both a User record and a Customer record. Emits CustomerCreatedV1 outbox event."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Products",
+      "item": [
+        {
+          "name": "Create Product",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Wireless Headphones\",\n  \"sku\": \"ELEC-HP-001\",\n  \"imageUrl\": \"https://example.com/images/headphones.jpg\",\n  \"price\": 149.99,\n  \"stockQuantity\": 50\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/products",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "products"]
+            },
+            "description": "Create a new product. SKU and name must be unique. Emits ProductCreatedV1 outbox event. Requires Admin role."
+          }
+        },
+        {
+          "name": "Get Products (Paged)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/products?pageNumber=1&pageSize=10&sortBy=price&sortDirection=asc&search=headphones",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "products"],
+              "query": [
+                { "key": "pageNumber", "value": "1" },
+                { "key": "pageSize", "value": "10" },
+                { "key": "sortBy", "value": "price", "description": "name, price, sku, stockQuantity" },
+                { "key": "sortDirection", "value": "asc", "description": "asc or desc" },
+                { "key": "search", "value": "headphones", "description": "Filter by product name" }
+              ]
+            },
+            "description": "Returns a paginated list of products. Supports sorting by name, price, sku, stockQuantity and search by product name."
+          }
+        },
+        {
+          "name": "Get Product by ID",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/products/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "products", ":id"],
+              "variable": [{ "key": "id", "value": "", "description": "Product GUID" }]
+            },
+            "description": "Returns a single product by ID. Returns 404 if not found."
+          }
+        },
+        {
+          "name": "Update Product",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Wireless Headphones Pro\",\n  \"sku\": \"ELEC-HP-001\",\n  \"imageUrl\": \"https://example.com/images/headphones-pro.jpg\",\n  \"price\": 179.99,\n  \"stockQuantity\": 60\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/products/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "products", ":id"],
+              "variable": [{ "key": "id", "value": "", "description": "Product GUID" }]
+            },
+            "description": "Update an existing product. Requires Admin role."
+          }
+        },
+        {
+          "name": "Restock Product",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": 25\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/products/:id/restock",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "products", ":id", "restock"],
+              "variable": [{ "key": "id", "value": "", "description": "Product GUID" }]
+            },
+            "description": "Increase stock for an existing product. Requires Admin role."
+          }
+        },
+        {
+          "name": "Delete Product",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/products/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "products", ":id"],
+              "variable": [{ "key": "id", "value": "", "description": "Product GUID" }]
+            },
+            "description": "Delete a product. Requires Admin role."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Customers",
+      "item": [
+        {
+          "name": "Create Customer",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Alice\",\n  \"lastName\": \"Smith\",\n  \"email\": \"alice.smith@example.com\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/customers",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "customers"]
+            },
+            "description": "Create a new customer. Email must be unique. Emits CustomerCreatedV1 outbox event."
+          }
+        },
+        {
+          "name": "Get Customers (Paged)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/customers?pageNumber=1&pageSize=10&sortBy=lastName&sortDirection=asc&search=smith",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "customers"],
+              "query": [
+                { "key": "pageNumber", "value": "1" },
+                { "key": "pageSize", "value": "10" },
+                { "key": "sortBy", "value": "lastName", "description": "lastName, firstName, email" },
+                { "key": "sortDirection", "value": "asc", "description": "asc or desc" },
+                { "key": "search", "value": "smith", "description": "Filter by first name, last name, or email" }
+              ]
+            },
+            "description": "Returns a paginated list of customers. Requires Admin role."
+          }
+        },
+        {
+          "name": "Get Customer by ID",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/customers/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "customers", ":id"],
+              "variable": [{ "key": "id", "value": "", "description": "Customer GUID" }]
+            },
+            "description": "Returns a single customer by ID. Admin can view any customer; standard users can view only their own record."
+          }
+        },
+        {
+          "name": "Update Customer",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Alice\",\n  \"lastName\": \"Johnson\",\n  \"email\": \"alice.johnson@example.com\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/customers/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "customers", ":id"],
+              "variable": [{ "key": "id", "value": "", "description": "Customer GUID" }]
+            },
+            "description": "Update a customer. Admin can update any customer; standard users can update only their own record."
+          }
+        },
+        {
+          "name": "Delete Customer",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/customers/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "customers", ":id"],
+              "variable": [{ "key": "id", "value": "", "description": "Customer GUID" }]
+            },
+            "description": "Delete a customer. Requires Admin role."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Orders",
+      "item": [
+        {
+          "name": "Place Order",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": \"<customer-guid>\",\n  \"items\": [\n    {\n      \"productId\": \"<product-guid>\",\n      \"quantity\": 2\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "orders"]
+            },
+            "description": "Place a new order. Deducts stock atomically. Returns 400 if stock is insufficient or items are empty. Emits OrderPlacedV1 outbox event."
+          }
+        },
+        {
+          "name": "Get Orders (Paged)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders?pageNumber=1&pageSize=10&status=Pending&sortBy=createdAt&sortDirection=desc&search=smith",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "orders"],
+              "query": [
+                { "key": "pageNumber", "value": "1" },
+                { "key": "pageSize", "value": "10" },
+                { "key": "status", "value": "Pending", "description": "Pending, Completed, Cancelled" },
+                { "key": "sortBy", "value": "createdAt", "description": "createdAt, totalAmount, status" },
+                { "key": "sortDirection", "value": "desc" },
+                { "key": "customerId", "value": "", "disabled": true, "description": "Filter by customer GUID" },
+                { "key": "search", "value": "smith", "description": "Admin only: filter by customer first name, last name, or email" }
+              ]
+            },
+            "description": "Returns a paginated list of orders. Supports filtering by status and customerId, sorting by createdAt, totalAmount, status, plus admin-only customer search."
+          }
+        },
+        {
+          "name": "Get Order by ID",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "orders", ":id"],
+              "variable": [{ "key": "id", "value": "", "description": "Order GUID" }]
+            },
+            "description": "Returns a single order with its line items."
+          }
+        },
+        {
+          "name": "Get Order Summary",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders/summary",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "orders", "summary"]
+            },
+            "description": "Returns aggregate order statistics: total orders, revenue, and counts by status."
+          }
+        },
+        {
+          "name": "Get Top Products",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders/top-products?limit=5",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "orders", "top-products"],
+              "query": [
+                { "key": "limit", "value": "5", "description": "Number of top-selling products to return" }
+              ]
+            },
+            "description": "Returns the top-selling completed-order products by revenue. Requires Admin role."
+          }
+        },
+        {
+          "name": "Complete Order",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders/:id/complete",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "orders", ":id", "complete"],
+              "variable": [{ "key": "id", "value": "", "description": "Order GUID" }]
+            },
+            "description": "Transition a Pending order to Completed. Returns 400 if the order is not in Pending state. Emits OrderStatusChangedV1 outbox event."
+          }
+        },
+        {
+          "name": "Cancel Order",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders/:id/cancel",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "orders", ":id", "cancel"],
+              "variable": [{ "key": "id", "value": "", "description": "Order GUID" }]
+            },
+            "description": "Cancel a Pending order. Restores stock for all order items. Returns 400 if the order is not in Pending state. Emits OrderStatusChangedV1 outbox event."
+          }
+        },
+        {
+          "name": "Delete Order",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "orders", ":id"],
+              "variable": [{ "key": "id", "value": "", "description": "Order GUID" }]
+            },
+            "description": "Delete an order. Requires Admin role."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "Seed Data",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customers\": 100,\n  \"products\": 100,\n  \"orders\": 500\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/seed",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "seed"]
+            },
+            "description": "Generate realistic test data using Bogus. Requires Admin role. All created entities emit outbox events."
+          }
+        },
+        {
+          "name": "Admin Health Check",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/admin/secret",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "secret"]
+            },
+            "description": "Verify Admin role access. Returns 403 Forbidden for User role."
+          }
+        }
+      ]
+    }
+  ]
+}

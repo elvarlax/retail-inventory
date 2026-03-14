@@ -1,4 +1,4 @@
-name: Retail Inventory - .NET Backend CI
+name: CI
 
 on:
   push:
@@ -7,23 +7,49 @@ on:
     branches: [ "main" ]
 
 jobs:
-  build-and-test:
+  backend:
+    name: .NET Build & Test
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
 
-      - name: Restore dependencies
+      - name: Restore
         run: dotnet restore
 
       - name: Build
-        run: dotnet build --no-restore --configuration Release
+        run: dotnet build --no-restore -c Release
 
-      - name: Run tests
-        run: dotnet test --no-build --configuration Release --verbosity normal
+      - name: Test (unit + integration, exclude load tests)
+        run: dotnet test --no-build -c Release --filter "Category!=LoadTest" --verbosity normal
+
+  frontend:
+    name: React Build & Type Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: src/RetailInventory.Web/package.json
+
+      - name: Install dependencies
+        working-directory: src/RetailInventory.Web
+        run: npm install
+
+      - name: Type check
+        working-directory: src/RetailInventory.Web
+        run: npx tsc --noEmit
+
+      - name: Build
+        working-directory: src/RetailInventory.Web
+        run: npm run build

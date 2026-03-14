@@ -3,16 +3,17 @@ services:
     image: postgres:16
     container_name: retail_inventory_postgres
     restart: always
+    env_file: .env
     environment:
-      POSTGRES_DB: retail_inventory
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -20,9 +21,11 @@ services:
   sqledge:
     image: mcr.microsoft.com/azure-sql-edge
     container_name: retail_sqledge
+    restart: on-failure
+    env_file: .env
     environment:
       ACCEPT_EULA: "Y"
-      MSSQL_SA_PASSWORD: "Password123!"
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD}
     healthcheck:
       test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/1433'"]
       interval: 10s
@@ -33,13 +36,15 @@ services:
   servicebus:
     image: mcr.microsoft.com/azure-messaging/servicebus-emulator
     container_name: retail_servicebus
+    restart: on-failure
     depends_on:
       sqledge:
         condition: service_healthy
+    env_file: .env
     environment:
       ACCEPT_EULA: "Y"
       SQL_SERVER: sqledge
-      MSSQL_SA_PASSWORD: "Password123!"
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD}
     ports:
       - "5672:5672"
       - "9354:9354"
@@ -49,7 +54,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: RetailInventory.Api/Dockerfile
+      dockerfile: src/RetailInventory.Api/Dockerfile
     container_name: retail_inventory_api
     restart: on-failure
     depends_on:
@@ -57,14 +62,27 @@ services:
         condition: service_healthy
       servicebus:
         condition: service_started
+    env_file: .env
     environment:
       ASPNETCORE_ENVIRONMENT: Development
-      ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=retail_inventory;Username=postgres;Password=postgres
-      ServiceBus__ConnectionString: Endpoint=sb://servicebus;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE=;UseDevelopmentEmulator=true;
+      ConnectionStrings__DefaultConnection: Host=${POSTGRES_HOST};Port=${POSTGRES_PORT};Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      Jwt__Key: ${JWT_KEY}
+      ServiceBus__ConnectionString: ${SERVICEBUS_CONNECTION_STRING}
       ServiceBus__TopicName: retail.events
       ServiceBus__SubscriptionName: analytics-sub
     ports:
       - "8080:8080"
+
+  web:
+    build:
+      context: ./src/RetailInventory.Web
+      dockerfile: Dockerfile
+    container_name: retail_inventory_web
+    restart: on-failure
+    depends_on:
+      - api
+    ports:
+      - "3000:80"
 
 volumes:
   postgres_data:

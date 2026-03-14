@@ -1,4 +1,7 @@
 <Solution>
-  <Project Path="RetailInventory.Api/RetailInventory.Api.csproj" />
-  <Project Path="RetailInventory.Tests/RetailInventory.Tests.csproj" Id="c11d5f49-6664-49b1-8308-a1aba0a4daec" />
+  <Project Path="src/RetailInventory.Api/RetailInventory.Api.csproj" />
+  <Project Path="src/RetailInventory.Application/RetailInventory.Application.csproj" />
+  <Project Path="src/RetailInventory.Domain/RetailInventory.Domain.csproj" />
+  <Project Path="src/RetailInventory.Infrastructure/RetailInventory.Infrastructure.csproj" />
+  <Project Path="tests/RetailInventory.Tests/RetailInventory.Tests.csproj" Id="c11d5f49-6664-49b1-8308-a1aba0a4daec" />
 </Solution>

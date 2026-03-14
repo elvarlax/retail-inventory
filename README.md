@@ -1,393 +1,140 @@
-# Retail Inventory API
+# Retail Inventory
 
-[![Build and Test](https://github.com/elvarlax/retail-inventory/actions/workflows/dotnet-ci.yml/badge.svg)](https://github.com/elvarlax/retail-inventory/actions)
+[![CI](https://github.com/elvarlax/retail-inventory/actions/workflows/dotnet-ci.yml/badge.svg?branch=main)](https://github.com/elvarlax/retail-inventory/actions/workflows/dotnet-ci.yml)
 
-Retail Inventory API is a backend-focused project built with **ASP\.NET Core (.NET 10)** and **PostgreSQL**.
+Retail Inventory is a full-stack portfolio project built with **ASP\.NET Core (.NET 10)**, **PostgreSQL**, and **React + TypeScript**. It focuses on practical backend engineering patterns: Clean Architecture, CQRS-style reads and writes, JWT auth, API versioning, transactional outbox messaging, Dockerized infrastructure, and automated testing.
 
-The project demonstrates layered architecture, event-driven design via the transactional outbox pattern, transactional domain logic, pagination, sorting, JWT-based authentication, role-based authorization, structured logging, repository abstraction, automated test coverage, and Dockerized infrastructure — reflecting real-world backend engineering practices.
+## Highlights
 
----
+- Clean Architecture with vertical slices in the Application layer
+- EF Core for writes, Dapper for read models
+- Transactional outbox pattern with Azure Service Bus publishing
+- JWT authentication with role-based authorization
+- Admin dashboard with order summary and top products
+- Unit, integration, and NBomber load tests
 
-# Architecture
+## Architecture
 
-## Application Layers
+Dependency flow:
 
-Controller → Service → Repository → DbContext → PostgreSQL
+```text
+Api -> Application -> Domain
+Api -> Infrastructure -> Application -> Domain
+```
 
-* Controllers handle HTTP concerns only (routing, status codes, request/response shaping)
-* Services encapsulate domain logic and enforce business invariants
-* Repositories abstract query and persistence logic
-* Entity Framework Core manages database access and migrations
-* PostgreSQL stores operational data
+Project structure:
 
-SQLite (in-memory) is used during automated tests to provide a fast relational test environment.
-
----
+```text
+src/
+|-- RetailInventory.Domain
+|-- RetailInventory.Application
+|-- RetailInventory.Infrastructure
+|-- RetailInventory.Api
+`-- RetailInventory.Web
+tests/
+`-- RetailInventory.Tests
+```
 
 ## System Architecture
-
-The service also acts as an **event producer** in a broader event-driven data platform architecture.
 
 ```mermaid
 flowchart LR
 
-Client[Client / Frontend]
+Web[React + TypeScript]
 API[ASP.NET Core API]
-DB[(PostgreSQL OLTP)]
-Bus[(Azure Service Bus retail.events)]
-Analytics[retail-analytics]
+DB[(PostgreSQL + outbox_messages)]
+Outbox[Outbox Publisher]
+Bus[(Azure Service Bus)]
+Analytics[Retail Analytics Consumer]
 
-Client --> API
+Web --> API
 API --> DB
-DB -- OutboxPublisher --> Bus
+DB --> Outbox
+Outbox --> Bus
 Bus --> Analytics
 ```
 
-This architecture enables reliable event-driven integration with downstream systems without requiring distributed transactions.
+## Eventing
 
-Events produced by this service are consumed by the **retail-analytics** project to build an analytics warehouse.
+The project uses the **transactional outbox pattern**. When customers, products, or orders are created or updated, an event is written to `outbox_messages` in the same transaction as the business change. A background service then publishes unpublished messages to Azure Service Bus.
 
----
+Events emitted include:
 
-# Event-Driven Architecture — Transactional Outbox Pattern
+- `CustomerCreatedV1`
+- `ProductCreatedV1`
+- `OrderPlacedV1`
+- `OrderStatusChangedV1`
 
-Every domain mutation writes an event to an `outbox_messages` table in the **same database transaction** as the state change.
+## API Surface
 
-A background service (`OutboxPublisher`) polls the table and publishes unpublished messages to an **Azure Service Bus topic**.
+Main capabilities:
 
-### Event Pipeline
+- authentication: `POST /auth/login`, `POST /auth/register`
+- products: create, list, detail, update, restock, delete
+- customers: create, list, detail, update, delete
+- orders: place, list, detail, complete, cancel, delete
+- admin: seed data, order summary, top products
 
+List endpoints support pagination, sorting, and search where appropriate.
+
+## Local Run
+
+Prerequisites:
+
+- Docker + Docker Compose
+- .NET 10 SDK
+
+Start the stack:
+
+```bash
+docker compose up --build -d
 ```
-API
- ↓
-PostgreSQL (outbox_messages)
- ↓
-OutboxPublisher
- ↓
-Azure Service Bus Topic
- ↓
-retail-analytics consumer
- ↓
-events.retail_events
- ↓
-dbt transformations
- ↓
-analytics tables
-```
 
----
+Main URLs:
 
-## Events Emitted
+- Web UI: `http://localhost:3000`
+- Swagger: `http://localhost:8080/swagger`
 
-| Event                  | Trigger                                       |
-| ---------------------- | --------------------------------------------- |
-| `CustomerCreatedV1`    | `POST /auth/register` or seed                 |
-| `ProductCreatedV1`     | `POST /api/products` or seed                  |
-| `OrderPlacedV1`        | `POST /api/orders`                            |
-| `OrderStatusChangedV1` | `POST /api/orders/{id}/complete` or `/cancel` |
+Seeded credentials:
 
----
-
-## OutboxPublisher Behaviour
-
-* Polls every **3 seconds** for unpublished messages
-* Sends **batches of up to 20 messages**
-* **Exponential backoff** on failure (5s × attempt, capped at 60s)
-* `published_at_utc` is stamped only after confirmed send
-
-Local development uses the **Azure Service Bus Emulator** running inside Docker.
-
----
-
-# Authentication & Authorization
-
-The API uses **JWT Bearer authentication**.
-
-* Token-based authentication using a symmetric signing key
-* Role-based authorization (Admin / User)
-* Protected endpoints via `[Authorize]`
-* Swagger UI with JWT support
-
-### Default Seeded Credentials
-
-| Role  | Email       | Password  |
-| ----- | ----------- | --------- |
+| Role | Email | Password |
+|---|---|---|
 | Admin | admin@local | Admin123! |
-| User  | user@local  | User123!  |
+| User | user@local | User123! |
 
-Endpoints:
+## Testing
 
-```
-POST /auth/login
-POST /auth/register
-```
+Run the regular test suite:
 
-Register also emits `CustomerCreatedV1`.
-
----
-
-# Domain Overview
-
-## Products
-
-* Unique constraint on `SKU`
-* DTO projection via AutoMapper
-* Pagination and sorting support
-* Emits `ProductCreatedV1`
-
-Endpoints:
-
-```
-POST /api/products
-GET /api/products
-GET /api/products/{id}
+```bash
+dotnet test --filter "Category!=LoadTest"
 ```
 
----
+Run the load test separately:
 
-## Customers
-
-* Unique constraint on `Email`
-* DTO projection via AutoMapper
-* Pagination and sorting support
-
-Endpoints:
-
-```
-GET /api/customers
-GET /api/customers/{id}
+```bash
+dotnet test --filter "Category=LoadTest"
 ```
 
----
-
-## Orders
-
-The **Order aggregate** contains the core business logic.
-
-Features:
-
-* Transactional order creation
-* Stock deduction during order placement
-* Stock restoration on cancel
-* State transitions
-
-```
-Pending → Completed
-Pending → Cancelled
-```
-
-Events emitted:
-
-* `OrderPlacedV1`
-* `OrderStatusChangedV1`
-
-Endpoints:
-
-```
-POST /api/orders
-GET /api/orders
-GET /api/orders/{id}
-GET /api/orders/summary
-POST /api/orders/{id}/complete
-POST /api/orders/{id}/cancel
-```
-
----
-
-# Admin — Data Seeding
-
-Generates realistic test data using **Bogus**.
-
-Events emitted during seeding:
-
-* `CustomerCreatedV1`
-* `ProductCreatedV1`
-* `OrderPlacedV1`
-* `OrderStatusChangedV1`
-
-Endpoint:
-
-```
-POST /admin/seed
-```
-
-Example body:
-
-```
-{
-  "customers": 1000,
-  "products": 1000,
-  "orders": 5000
-}
-```
-
----
-
-# Pagination, Filtering & Sorting
-
-Orders support:
-
-* `pageNumber`
-* `pageSize`
-* `status`
-* `sortBy`
-* `sortDirection`
-
-Example:
-
-```
-GET /api/orders?pageNumber=1&pageSize=10&status=Completed
-GET /api/products?pageNumber=1&pageSize=10&sortBy=price&sortDirection=desc
-```
-
----
-
-# Structured Logging
-
-Uses **Serilog** with:
-
-* structured logs
-* request logging middleware
-* environment-based configuration
-
----
-
-# Transaction Handling
-
-Order creation is wrapped in a database transaction covering:
-
-* Stock deduction
-* Order persistence
-* Order items persistence
-* Outbox event insertion
-
-All succeed together or none are committed.
-
----
-
-# Performance
-
-* Eliminates N+1 queries
-* Batch product lookups
-* Indexed query paths
-* `AsNoTracking()` on read queries
-* Indexed `outbox_messages.published_at_utc`
-
----
-
-# Testing Strategy
-
-## Unit Tests
-
-* SQLite in-memory provider
-* Domain rule validation
-* Pagination coverage
-
-## Integration Tests
-
-* `WebApplicationFactory`
-* Full HTTP pipeline
-* Isolated database per test
-* Outbox event verification
-
----
-
-# Running Locally
-
-### Prerequisites
-
-* Docker
-* Docker Compose
-* .NET 10 SDK
-
----
-
-## Start the Stack
-
-```
-docker-compose up --build -d
-```
-
-Swagger:
-
-```
-http://localhost:8080/swagger
-```
-
----
-
-## Seed Data
-
-```
-POST /admin/seed
-```
-
----
-
-## Run Tests
-
-```
-dotnet test
-```
-
----
-
-# Docker
-
-Runs:
-
-* API
-* PostgreSQL
-* Azure Service Bus Emulator
-* SQL Edge
-
-Startup order:
-
-1. `sqledge`
-2. `servicebus`
-3. `postgres`
-4. `api`
-
----
-
-# Tech Stack
-
-* .NET 10
-* ASP\.NET Core Web API
-* Entity Framework Core
-* PostgreSQL (Npgsql)
-* Azure Service Bus
-* Azure Service Bus Emulator
-* SQLite (testing)
-* AutoMapper
-* Bogus
-* BCrypt\.Net
-* Serilog
-* xUnit + FluentAssertions
-* Docker
-* GitHub Actions
-
----
-
-# Input Validation
-
-DTO validation via `[ApiController]`.
-
-Examples:
-
-* Email validation on login
-* Quantity validation on order items
-* Seed limits on admin endpoint
-
----
-
-# Design Principles
-
-* Business logic lives in services
-* Repositories isolate persistence
-* Transactions protect aggregate invariants
-* Outbox ensures reliable event publishing
-* DTOs decouple API contracts
-* Tests validate both domain rules and HTTP behaviour
-* Infrastructure adapts to environment
-* Read queries use `AsNoTracking()` for efficiency
+## Postman
+
+The included `retail-inventory.postman_collection.json` covers:
+
+- auth flows
+- product/customer/order CRUD
+- admin seed and secret routes
+- order summary and top-products endpoints
+
+Set `baseUrl` to your running API and log in first so the collection stores the bearer token automatically.
+
+## Tech Stack
+
+| Category | Technology |
+|---|---|
+| Backend | .NET 10, ASP\.NET Core |
+| Data | EF Core, Dapper, PostgreSQL |
+| Frontend | React, TypeScript, Vite |
+| Messaging | Azure Service Bus |
+| Auth | JWT Bearer |
+| Testing | xUnit, FluentAssertions, NBomber |
+| Infrastructure | Docker, Docker Compose, Nginx |
