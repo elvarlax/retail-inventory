@@ -1,3 +1,4 @@
+using MediatR;
 using RetailInventory.Application.Common.DTOs;
 using RetailInventory.Application.Common.Exceptions;
 using RetailInventory.Application.Interfaces;
@@ -6,7 +7,7 @@ using RetailInventory.Domain;
 
 namespace RetailInventory.Application.Orders.Queries;
 
-public class GetOrdersHandler
+public class GetOrdersHandler : IRequestHandler<GetOrdersQuery, PagedResultDto<OrderDto>>
 {
     private readonly IOrderQueryRepository _repository;
 
@@ -15,7 +16,7 @@ public class GetOrdersHandler
         _repository = repository;
     }
 
-    public async Task<PagedResultDto<OrderDto>> Handle(GetOrdersQuery query)
+    public async Task<PagedResultDto<OrderDto>> Handle(GetOrdersQuery query, CancellationToken ct)
     {
         var pageNumber = query.PageNumber <= 0 ? 1 : query.PageNumber;
         var pageSize = query.PageSize <= 0 || query.PageSize > 50 ? 10 : query.PageSize;

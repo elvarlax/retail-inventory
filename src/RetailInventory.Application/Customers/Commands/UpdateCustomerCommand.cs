@@ -1,3 +1,5 @@
+using MediatR;
+
 namespace RetailInventory.Application.Customers.Commands;
 
-public record UpdateCustomerCommand(Guid Id, string FirstName, string LastName, string Email);
+public record UpdateCustomerCommand(Guid Id, string FirstName, string LastName, string Email) : IRequest;

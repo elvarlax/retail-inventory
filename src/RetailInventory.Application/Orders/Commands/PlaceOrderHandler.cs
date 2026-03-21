@@ -1,3 +1,4 @@
+using MediatR;
 using RetailInventory.Application.Common.Exceptions;
 using RetailInventory.Application.Interfaces;
 using RetailInventory.Application.Orders.Events;
@@ -7,7 +8,7 @@ using System.Text.Json;
 
 namespace RetailInventory.Application.Orders.Commands;
 
-public class PlaceOrderHandler
+public class PlaceOrderHandler : IRequestHandler<PlaceOrderCommand, Guid>
 {
     private readonly IOrderRepository _orderRepository;
     private readonly IProductRepository _productRepository;
@@ -26,7 +27,7 @@ public class PlaceOrderHandler
         _outboxRepository = outboxRepository;
     }
 
-    public async Task<Guid> Handle(PlaceOrderCommand command)
+    public async Task<Guid> Handle(PlaceOrderCommand command, CancellationToken ct)
     {
         if (command.CustomerId == Guid.Empty)
             throw new BadRequestException("CustomerId is required.");
@@ -37,11 +38,11 @@ public class PlaceOrderHandler
         if (command.Items.Any(i => i.Quantity <= 0))
             throw new BadRequestException("Quantity must be greater than zero.");
 
-        if (!await _customerRepository.ExistsAsync(command.CustomerId))
+        if (!await _customerRepository.ExistsAsync(command.CustomerId, ct))
             throw new NotFoundException("Customer not found.");
 
         var requestedIds = command.Items.Select(i => i.ProductId).Distinct();
-        var products = await _productRepository.GetByIdsAsync(requestedIds);
+        var products = await _productRepository.GetByIdsAsync(requestedIds, ct);
         var productMap = products.ToDictionary(p => p.Id);
 
         var occurredAt = DateTime.UtcNow;
@@ -90,7 +91,7 @@ public class PlaceOrderHandler
 
         order.TotalAmount = total;
 
-        await _orderRepository.AddAsync(order);
+        await _orderRepository.AddAsync(order, ct);
 
         var @event = new OrderPlacedV1
         {
@@ -111,7 +112,7 @@ public class PlaceOrderHandler
         ));
 
         // SaveChangesAsync commits the new order, stock decrements, and outbox entry atomically.
-        await _orderRepository.SaveChangesAsync();
+        await _orderRepository.SaveChangesAsync(ct);
 
         return order.Id;
     }

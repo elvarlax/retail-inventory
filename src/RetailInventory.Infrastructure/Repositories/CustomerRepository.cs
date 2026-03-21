@@ -14,35 +14,35 @@ public class CustomerRepository : ICustomerRepository
         _dbContext = dbContext;
     }
 
-    public async Task AddAsync(Customer customer)
+    public async Task AddAsync(Customer customer, CancellationToken ct = default)
     {
-        await _dbContext.Customers.AddAsync(customer);
+        await _dbContext.Customers.AddAsync(customer, ct);
     }
 
-    public async Task<bool> ExistsAsync(Guid id)
+    public async Task<bool> ExistsAsync(Guid id, CancellationToken ct = default)
     {
-        return await _dbContext.Customers.AnyAsync(c => c.Id == id);
+        return await _dbContext.Customers.AnyAsync(c => c.Id == id, ct);
     }
 
-    public async Task<Customer?> GetByIdAsync(Guid id)
+    public async Task<Customer?> GetByIdAsync(Guid id, CancellationToken ct = default)
     {
-        return await _dbContext.Customers.FindAsync(id);
+        return await _dbContext.Customers.FindAsync([id], ct);
     }
 
-    public async Task<Customer?> GetByEmailAsync(string email)
+    public async Task<Customer?> GetByEmailAsync(string email, CancellationToken ct = default)
     {
         return await _dbContext.Customers
-            .FirstOrDefaultAsync(c => c.Email.ToLower() == email.ToLower());
+            .FirstOrDefaultAsync(c => c.Email.ToLower() == email.ToLower(), ct);
     }
 
-    public Task DeleteAsync(Customer customer)
+    public Task DeleteAsync(Customer customer, CancellationToken ct = default)
     {
         _dbContext.Customers.Remove(customer);
         return Task.CompletedTask;
     }
 
-    public async Task SaveChangesAsync()
+    public async Task SaveChangesAsync(CancellationToken ct = default)
     {
-        await _dbContext.SaveChangesAsync();
+        await _dbContext.SaveChangesAsync(ct);
     }
 }

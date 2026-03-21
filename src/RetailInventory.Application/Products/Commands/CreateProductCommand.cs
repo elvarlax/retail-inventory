@@ -1,3 +1,5 @@
+using MediatR;
+
 namespace RetailInventory.Application.Products.Commands;
 
 public record CreateProductCommand(
@@ -6,4 +8,4 @@ public record CreateProductCommand(
     string? ImageUrl,
     decimal Price,
     int StockQuantity
-);
+) : IRequest<Guid>;

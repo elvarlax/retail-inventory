@@ -7,6 +7,8 @@ Retail Inventory is a full-stack portfolio project built with **ASP\.NET Core (.
 ## Highlights
 
 - Clean Architecture with vertical slices in the Application layer
+- MediatR CQRS — controllers depend only on `ISender`, handlers auto-discovered at startup
+- CancellationToken propagated from controller through handler to every repository call
 - EF Core for writes, Dapper for read models
 - Transactional outbox pattern with Azure Service Bus publishing
 - JWT authentication with role-based authorization
@@ -93,7 +95,7 @@ docker compose up --build -d
 Main URLs:
 
 - Web UI: `http://localhost:3000`
-- Swagger: `http://localhost:8080/swagger`
+- API Docs (Scalar): `http://localhost:8080/scalar/v1`
 
 Seeded credentials:
 
@@ -131,10 +133,11 @@ Set `baseUrl` to your running API and log in first so the collection stores the 
 
 | Category | Technology |
 |---|---|
-| Backend | .NET 10, ASP\.NET Core |
+| Backend | .NET 10, ASP\.NET Core, MediatR |
 | Data | EF Core, Dapper, PostgreSQL |
 | Frontend | React, TypeScript, Vite |
 | Messaging | Azure Service Bus |
 | Auth | JWT Bearer |
+| API Docs | Scalar, .NET 10 built-in OpenAPI |
 | Testing | xUnit, FluentAssertions, NBomber |
 | Infrastructure | Docker, Docker Compose, Nginx |

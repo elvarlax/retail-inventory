@@ -1,4 +1,5 @@
 using Asp.Versioning;
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RetailInventory.Api.DTOs;
@@ -13,32 +14,19 @@ namespace RetailInventory.Api.Controllers;
 [Route("api/v{version:apiVersion}/[controller]")]
 public class CustomersController : ControllerBase
 {
-    private readonly CreateCustomerHandler _createCustomerHandler;
-    private readonly GetCustomersHandler _getCustomersHandler;
-    private readonly GetCustomerByIdHandler _getCustomerByIdHandler;
-    private readonly UpdateCustomerHandler _updateCustomerHandler;
-    private readonly DeleteCustomerHandler _deleteCustomerHandler;
+    private readonly ISender _sender;
 
-    public CustomersController(
-        CreateCustomerHandler createCustomerHandler,
-        GetCustomersHandler getCustomersHandler,
-        GetCustomerByIdHandler getCustomerByIdHandler,
-        UpdateCustomerHandler updateCustomerHandler,
-        DeleteCustomerHandler deleteCustomerHandler)
+    public CustomersController(ISender sender)
     {
-        _createCustomerHandler = createCustomerHandler;
-        _getCustomersHandler = getCustomersHandler;
-        _getCustomerByIdHandler = getCustomerByIdHandler;
-        _updateCustomerHandler = updateCustomerHandler;
-        _deleteCustomerHandler = deleteCustomerHandler;
+        _sender = sender;
     }
 
     [Authorize(Roles = "Admin")]
     [HttpPost]
-    public async Task<IActionResult> Create(CreateCustomerRequest request)
+    public async Task<IActionResult> Create(CreateCustomerRequest request, CancellationToken ct)
     {
         var command = new CreateCustomerCommand(request.FirstName, request.LastName, request.Email);
-        var customer = await _createCustomerHandler.Handle(command);
+        var customer = await _sender.Send(command, ct);
         return CreatedAtAction(nameof(GetById), new { id = customer.Id }, null);
     }
 
@@ -49,21 +37,21 @@ public class CustomersController : ControllerBase
         [FromQuery] int pageSize = 10,
         [FromQuery] string? sortBy = null,
         [FromQuery] string? sortDirection = "asc",
-        [FromQuery] string? search = null)
+        [FromQuery] string? search = null,
+        CancellationToken ct = default)
     {
         var query = new GetCustomersQuery(pageNumber, pageSize, sortBy, sortDirection, search);
-        var result = await _getCustomersHandler.Handle(query);
+        var result = await _sender.Send(query, ct);
         return Ok(result);
     }
 
     [HttpGet("{id}")]
-    public async Task<IActionResult> GetById(Guid id)
+    public async Task<IActionResult> GetById(Guid id, CancellationToken ct)
     {
         if (!User.IsInRole("Admin") && !IsOwnRecord(id))
             return Forbid();
 
-        var query = new GetCustomerByIdQuery(id);
-        var customer = await _getCustomerByIdHandler.Handle(query);
+        var customer = await _sender.Send(new GetCustomerByIdQuery(id), ct);
 
         if (customer == null)
             return NotFound();
@@ -72,13 +60,13 @@ public class CustomersController : ControllerBase
     }
 
     [HttpPut("{id}")]
-    public async Task<IActionResult> Update(Guid id, UpdateCustomerRequest request)
+    public async Task<IActionResult> Update(Guid id, UpdateCustomerRequest request, CancellationToken ct)
     {
         if (!User.IsInRole("Admin") && !IsOwnRecord(id))
             return Forbid();
 
-        await _updateCustomerHandler.Handle(new UpdateCustomerCommand(
-            id, request.FirstName, request.LastName, request.Email));
+        await _sender.Send(new UpdateCustomerCommand(
+            id, request.FirstName, request.LastName, request.Email), ct);
         return NoContent();
     }
 
@@ -90,9 +78,9 @@ public class CustomersController : ControllerBase
 
     [Authorize(Roles = "Admin")]
     [HttpDelete("{id}")]
-    public async Task<IActionResult> Delete(Guid id)
+    public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
-        await _deleteCustomerHandler.Handle(new DeleteCustomerCommand(id));
+        await _sender.Send(new DeleteCustomerCommand(id), ct);
         return NoContent();
     }
 }

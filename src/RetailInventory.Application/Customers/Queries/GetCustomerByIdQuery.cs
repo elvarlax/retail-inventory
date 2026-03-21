@@ -1,3 +1,6 @@
+using MediatR;
+using RetailInventory.Application.Customers.DTOs;
+
 namespace RetailInventory.Application.Customers.Queries;
 
-public record GetCustomerByIdQuery(Guid Id);
+public record GetCustomerByIdQuery(Guid Id) : IRequest<CustomerDto?>;

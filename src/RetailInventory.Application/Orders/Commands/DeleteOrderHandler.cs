@@ -1,9 +1,10 @@
+using MediatR;
 using RetailInventory.Application.Common.Exceptions;
 using RetailInventory.Application.Interfaces;
 
 namespace RetailInventory.Application.Orders.Commands;
 
-public class DeleteOrderHandler
+public class DeleteOrderHandler : IRequestHandler<DeleteOrderCommand>
 {
     private readonly IOrderRepository _repository;
 
@@ -12,12 +13,12 @@ public class DeleteOrderHandler
         _repository = repository;
     }
 
-    public async Task Handle(DeleteOrderCommand command)
+    public async Task Handle(DeleteOrderCommand command, CancellationToken ct)
     {
-        var order = await _repository.GetByIdAsync(command.OrderId)
+        var order = await _repository.GetByIdAsync(command.OrderId, ct)
             ?? throw new NotFoundException("Order not found.");
 
-        await _repository.DeleteAsync(order);
-        await _repository.SaveChangesAsync();
+        await _repository.DeleteAsync(order, ct);
+        await _repository.SaveChangesAsync(ct);
     }
 }

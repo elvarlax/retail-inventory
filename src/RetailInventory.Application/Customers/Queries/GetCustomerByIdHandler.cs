@@ -1,9 +1,10 @@
+using MediatR;
 using RetailInventory.Application.Customers.DTOs;
 using RetailInventory.Application.Interfaces;
 
 namespace RetailInventory.Application.Customers.Queries;
 
-public class GetCustomerByIdHandler
+public class GetCustomerByIdHandler : IRequestHandler<GetCustomerByIdQuery, CustomerDto?>
 {
     private readonly ICustomerQueryRepository _queryRepository;
 
@@ -12,7 +13,7 @@ public class GetCustomerByIdHandler
         _queryRepository = queryRepository;
     }
 
-    public async Task<CustomerDto?> Handle(GetCustomerByIdQuery query)
+    public async Task<CustomerDto?> Handle(GetCustomerByIdQuery query, CancellationToken ct)
     {
         return await _queryRepository.GetByIdAsync(query.Id);
     }

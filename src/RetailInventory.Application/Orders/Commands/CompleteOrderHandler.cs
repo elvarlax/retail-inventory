@@ -1,3 +1,4 @@
+using MediatR;
 using RetailInventory.Application.Common.Exceptions;
 using RetailInventory.Application.Interfaces;
 using RetailInventory.Application.Orders.Events;
@@ -7,7 +8,7 @@ using System.Text.Json;
 
 namespace RetailInventory.Application.Orders.Commands;
 
-public class CompleteOrderHandler
+public class CompleteOrderHandler : IRequestHandler<CompleteOrderCommand>
 {
     private readonly IOrderRepository _orderRepository;
     private readonly IOutboxRepository _outboxRepository;
@@ -18,9 +19,9 @@ public class CompleteOrderHandler
         _outboxRepository = outboxRepository;
     }
 
-    public async Task Handle(CompleteOrderCommand command)
+    public async Task Handle(CompleteOrderCommand command, CancellationToken ct)
     {
-        var order = await _orderRepository.GetOrderForUpdateAsync(command.OrderId)
+        var order = await _orderRepository.GetOrderForUpdateAsync(command.OrderId, ct)
             ?? throw new NotFoundException("Order not found.");
 
         if (order.Status != OrderStatus.Pending)
@@ -48,6 +49,6 @@ public class CompleteOrderHandler
             OccurredAtUtc: occurredAt
         ));
 
-        await _orderRepository.SaveChangesAsync();
+        await _orderRepository.SaveChangesAsync(ct);
     }
 }

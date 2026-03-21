@@ -1,3 +1,5 @@
+using MediatR;
+
 namespace RetailInventory.Application.Orders.Commands;
 
-public record CompleteOrderCommand(Guid OrderId);
+public record CompleteOrderCommand(Guid OrderId) : IRequest;

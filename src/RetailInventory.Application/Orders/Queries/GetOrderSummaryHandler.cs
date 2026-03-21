@@ -1,9 +1,10 @@
+using MediatR;
 using RetailInventory.Application.Interfaces;
 using RetailInventory.Application.Orders.DTOs;
 
 namespace RetailInventory.Application.Orders.Queries;
 
-public class GetOrderSummaryHandler
+public class GetOrderSummaryHandler : IRequestHandler<GetOrderSummaryQuery, OrderSummaryDto>
 {
     private readonly IOrderQueryRepository _repository;
 
@@ -12,7 +13,7 @@ public class GetOrderSummaryHandler
         _repository = repository;
     }
 
-    public async Task<OrderSummaryDto> Handle(GetOrderSummaryQuery query)
+    public async Task<OrderSummaryDto> Handle(GetOrderSummaryQuery query, CancellationToken ct)
     {
         return await _repository.GetSummaryAsync();
     }

@@ -14,32 +14,32 @@ public class OrderRepository : IOrderRepository
         _dbContext = dbContext;
     }
 
-    public async Task AddAsync(Order order)
+    public async Task AddAsync(Order order, CancellationToken ct = default)
     {
-        await _dbContext.Orders.AddAsync(order);
+        await _dbContext.Orders.AddAsync(order, ct);
     }
 
-    public async Task<Order?> GetByIdAsync(Guid id)
+    public async Task<Order?> GetByIdAsync(Guid id, CancellationToken ct = default)
     {
         return await _dbContext.Orders
             .Include(o => o.OrderItems)
-            .FirstOrDefaultAsync(o => o.Id == id);
+            .FirstOrDefaultAsync(o => o.Id == id, ct);
     }
 
-    public async Task<Order?> GetOrderForUpdateAsync(Guid id)
+    public async Task<Order?> GetOrderForUpdateAsync(Guid id, CancellationToken ct = default)
     {
         return await _dbContext.Orders
-            .FirstOrDefaultAsync(o => o.Id == id);
+            .FirstOrDefaultAsync(o => o.Id == id, ct);
     }
 
-    public Task DeleteAsync(Order order)
+    public Task DeleteAsync(Order order, CancellationToken ct = default)
     {
         _dbContext.Orders.Remove(order);
         return Task.CompletedTask;
     }
 
-    public async Task SaveChangesAsync()
+    public async Task SaveChangesAsync(CancellationToken ct = default)
     {
-        await _dbContext.SaveChangesAsync();
+        await _dbContext.SaveChangesAsync(ct);
     }
 }

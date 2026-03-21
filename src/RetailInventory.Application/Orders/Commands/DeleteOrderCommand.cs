@@ -1,3 +1,5 @@
+using MediatR;
+
 namespace RetailInventory.Application.Orders.Commands;
 
-public record DeleteOrderCommand(Guid OrderId);
+public record DeleteOrderCommand(Guid OrderId) : IRequest;

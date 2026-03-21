@@ -1,4 +1,5 @@
 using AutoMapper;
+using MediatR;
 using RetailInventory.Application.Common.Exceptions;
 using RetailInventory.Application.Interfaces;
 using RetailInventory.Application.Outbox;
@@ -8,7 +9,7 @@ using System.Text.Json;
 
 namespace RetailInventory.Application.Products.Commands;
 
-public class CreateProductHandler
+public class CreateProductHandler : IRequestHandler<CreateProductCommand, Guid>
 {
     private readonly IProductRepository _productRepository;
     private readonly IOutboxRepository _outboxRepository;
@@ -21,18 +22,18 @@ public class CreateProductHandler
         _mapper = mapper;
     }
 
-    public async Task<Guid> Handle(CreateProductCommand command)
+    public async Task<Guid> Handle(CreateProductCommand command, CancellationToken ct)
     {
-        if (await _productRepository.GetBySkuAsync(command.SKU) != null)
+        if (await _productRepository.GetBySkuAsync(command.SKU, ct) != null)
             throw new ConflictException($"SKU '{command.SKU}' is already in use.");
 
-        if (await _productRepository.GetByNameAsync(command.Name) != null)
+        if (await _productRepository.GetByNameAsync(command.Name, ct) != null)
             throw new ConflictException($"A product named '{command.Name}' already exists.");
 
         var product = _mapper.Map<Product>(command);
         product.Id = Guid.NewGuid();
 
-        await _productRepository.AddAsync(product);
+        await _productRepository.AddAsync(product, ct);
 
         var occurredAt = DateTime.UtcNow;
 
@@ -56,7 +57,7 @@ public class CreateProductHandler
             OccurredAtUtc: occurredAt
         ));
 
-        await _productRepository.SaveChangesAsync();
+        await _productRepository.SaveChangesAsync(ct);
 
         return product.Id;
     }

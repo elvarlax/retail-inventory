@@ -1,9 +1,10 @@
+using MediatR;
 using RetailInventory.Application.Common.Exceptions;
 using RetailInventory.Application.Interfaces;
 
 namespace RetailInventory.Application.Products.Commands;
 
-public class DeleteProductHandler
+public class DeleteProductHandler : IRequestHandler<DeleteProductCommand>
 {
     private readonly IProductRepository _repository;
 
@@ -12,12 +13,12 @@ public class DeleteProductHandler
         _repository = repository;
     }
 
-    public async Task Handle(DeleteProductCommand command)
+    public async Task Handle(DeleteProductCommand command, CancellationToken ct)
     {
-        var product = await _repository.GetByIdAsync(command.Id)
+        var product = await _repository.GetByIdAsync(command.Id, ct)
             ?? throw new NotFoundException("Product not found.");
 
-        await _repository.DeleteAsync(product);
-        await _repository.SaveChangesAsync();
+        await _repository.DeleteAsync(product, ct);
+        await _repository.SaveChangesAsync(ct);
     }
 }

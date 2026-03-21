@@ -1,6 +1,7 @@
 using AutoMapper;
 using FluentAssertions;
-using RetailInventory.Application.Authentication;
+using Microsoft.Extensions.DependencyInjection;
+using RetailInventory.Application.Authentication.Commands;
 using RetailInventory.Application.Customers.Commands;
 using RetailInventory.Application.Interfaces;
 using RetailInventory.Application.Mappings;
@@ -33,7 +34,11 @@ public class CustomerHandlerTests
     }
 
     private static IMapper CreateMapper() =>
-        new MapperConfiguration(cfg => cfg.AddProfile<ApplicationMappingProfile>()).CreateMapper();
+        new ServiceCollection()
+            .AddLogging()
+            .AddAutoMapper(cfg => cfg.AddProfile<ApplicationMappingProfile>())
+            .BuildServiceProvider()
+            .GetRequiredService<IMapper>();
 
     private static CreateCustomerHandler CreateCustomerHandler(RetailDbContext db) =>
         new(new CustomerRepository(db), new FakeOutboxRepository(), CreateMapper());
@@ -65,7 +70,7 @@ public class CustomerHandlerTests
         var handler = CreateCustomerHandler(db);
 
         // Act
-        var result = await handler.Handle(new CreateCustomerCommand("John", "Doe", "john@test.com"));
+        var result = await handler.Handle(new CreateCustomerCommand("John", "Doe", "john@test.com"), CancellationToken.None);
 
         // Assert
         var customer = await db.Customers.FindAsync(result.Id);
@@ -89,7 +94,7 @@ public class CustomerHandlerTests
 
         // Act
         var result = await handler.Handle(
-            new RegisterCommand("Jane", "Doe", "jane@test.com", "password123"));
+            new RegisterCommand("Jane", "Doe", "jane@test.com", "password123"), CancellationToken.None);
 
         // Assert
         result.Should().NotBeNull();
@@ -108,11 +113,11 @@ public class CustomerHandlerTests
         await using var _ = conn;
 
         var handler = CreateRegisterHandler(db);
-        await handler.Handle(new RegisterCommand("Jane", "Doe", "jane@test.com", "password123"));
+        await handler.Handle(new RegisterCommand("Jane", "Doe", "jane@test.com", "password123"), CancellationToken.None);
 
         // Act
         var act = async () => await handler.Handle(
-            new RegisterCommand("Jane2", "Doe2", "jane@test.com", "password456"));
+            new RegisterCommand("Jane2", "Doe2", "jane@test.com", "password456"), CancellationToken.None);
 
         // Assert
         await act.Should().ThrowAsync<Exception>().WithMessage("*already in use*");
@@ -130,12 +135,12 @@ public class CustomerHandlerTests
         await using var _ = conn;
 
         var registerHandler = CreateRegisterHandler(db);
-        await registerHandler.Handle(new RegisterCommand("Jane", "Doe", "jane@test.com", "mypassword"));
+        await registerHandler.Handle(new RegisterCommand("Jane", "Doe", "jane@test.com", "mypassword"), CancellationToken.None);
 
         var loginHandler = CreateLoginHandler(db);
 
         // Act
-        var result = await loginHandler.Handle(new LoginCommand("jane@test.com", "mypassword"));
+        var result = await loginHandler.Handle(new LoginCommand("jane@test.com", "mypassword"), CancellationToken.None);
 
         // Assert
         result.Should().NotBeNull();
@@ -150,12 +155,12 @@ public class CustomerHandlerTests
         await using var _ = conn;
 
         var registerHandler = CreateRegisterHandler(db);
-        await registerHandler.Handle(new RegisterCommand("Jane", "Doe", "jane@test.com", "correctpassword"));
+        await registerHandler.Handle(new RegisterCommand("Jane", "Doe", "jane@test.com", "correctpassword"), CancellationToken.None);
 
         var loginHandler = CreateLoginHandler(db);
 
         // Act
-        var result = await loginHandler.Handle(new LoginCommand("jane@test.com", "wrongpassword"));
+        var result = await loginHandler.Handle(new LoginCommand("jane@test.com", "wrongpassword"), CancellationToken.None);
 
         // Assert
         result.Should().BeNull();
@@ -171,7 +176,7 @@ public class CustomerHandlerTests
         var handler = CreateLoginHandler(db);
 
         // Act
-        var result = await handler.Handle(new LoginCommand("nobody@test.com", "password"));
+        var result = await handler.Handle(new LoginCommand("nobody@test.com", "password"), CancellationToken.None);
 
         // Assert
         result.Should().BeNull();

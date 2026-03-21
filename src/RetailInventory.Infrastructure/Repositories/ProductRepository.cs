@@ -14,42 +14,42 @@ public class ProductRepository : IProductRepository
         _dbContext = dbContext;
     }
 
-    public async Task AddAsync(Product product)
+    public async Task AddAsync(Product product, CancellationToken ct = default)
     {
-        await _dbContext.Products.AddAsync(product);
+        await _dbContext.Products.AddAsync(product, ct);
     }
 
-    public async Task<Product?> GetBySkuAsync(string sku)
+    public async Task<Product?> GetBySkuAsync(string sku, CancellationToken ct = default)
     {
-        return await _dbContext.Products.FirstOrDefaultAsync(p => p.SKU == sku);
+        return await _dbContext.Products.FirstOrDefaultAsync(p => p.SKU == sku, ct);
     }
 
-    public async Task<Product?> GetByNameAsync(string name)
+    public async Task<Product?> GetByNameAsync(string name, CancellationToken ct = default)
     {
-        return await _dbContext.Products.FirstOrDefaultAsync(p => p.Name == name);
+        return await _dbContext.Products.FirstOrDefaultAsync(p => p.Name == name, ct);
     }
 
-    public async Task<List<Product>> GetByIdsAsync(IEnumerable<Guid> ids)
+    public async Task<List<Product>> GetByIdsAsync(IEnumerable<Guid> ids, CancellationToken ct = default)
     {
         var idList = ids.ToList();
         return await _dbContext.Products
             .Where(p => idList.Contains(p.Id))
-            .ToListAsync();
+            .ToListAsync(ct);
     }
 
-    public async Task<Product?> GetByIdAsync(Guid id)
+    public async Task<Product?> GetByIdAsync(Guid id, CancellationToken ct = default)
     {
-        return await _dbContext.Products.FindAsync(id);
+        return await _dbContext.Products.FindAsync([id], ct);
     }
 
-    public Task DeleteAsync(Product product)
+    public Task DeleteAsync(Product product, CancellationToken ct = default)
     {
         _dbContext.Products.Remove(product);
         return Task.CompletedTask;
     }
 
-    public async Task SaveChangesAsync()
+    public async Task SaveChangesAsync(CancellationToken ct = default)
     {
-        await _dbContext.SaveChangesAsync();
+        await _dbContext.SaveChangesAsync(ct);
     }
 }

@@ -1,4 +1,5 @@
 using Bogus;
+using MediatR;
 using RetailInventory.Application.Customers.Commands;
 using RetailInventory.Application.Orders.Commands;
 using RetailInventory.Application.Products.Commands;
@@ -10,24 +11,11 @@ public class SeedService : ISeedService
     private static readonly string[] Categories =
         ["ELEC", "CLTH", "HOME", "SPRT", "FOOD", "BOOK", "TOYS", "AUTO"];
 
-    private readonly CreateCustomerHandler _createCustomerHandler;
-    private readonly CreateProductHandler _createProductHandler;
-    private readonly PlaceOrderHandler _placeOrderHandler;
-    private readonly CompleteOrderHandler _completeOrderHandler;
-    private readonly CancelOrderHandler _cancelOrderHandler;
+    private readonly ISender _sender;
 
-    public SeedService(
-        CreateCustomerHandler createCustomerHandler,
-        CreateProductHandler createProductHandler,
-        PlaceOrderHandler placeOrderHandler,
-        CompleteOrderHandler completeOrderHandler,
-        CancelOrderHandler cancelOrderHandler)
+    public SeedService(ISender sender)
     {
-        _createCustomerHandler = createCustomerHandler;
-        _createProductHandler = createProductHandler;
-        _placeOrderHandler = placeOrderHandler;
-        _completeOrderHandler = completeOrderHandler;
-        _cancelOrderHandler = cancelOrderHandler;
+        _sender = sender;
     }
 
     public async Task<SeedResult> SeedAsync(int customers, int products, int orders)
@@ -37,7 +25,7 @@ public class SeedService : ISeedService
         var customerIds = new List<Guid>();
         for (var i = 0; i < customers; i++)
         {
-            var customer = await _createCustomerHandler.Handle(new CreateCustomerCommand(
+            var customer = await _sender.Send(new CreateCustomerCommand(
                 FirstName: faker.Name.FirstName(),
                 LastName: faker.Name.LastName(),
                 Email: $"{faker.Internet.UserName()}.{Guid.NewGuid().ToString("N")[..8]}@{faker.Internet.DomainName()}"
@@ -48,7 +36,7 @@ public class SeedService : ISeedService
         var productIds = new List<Guid>();
         for (var i = 0; i < products; i++)
         {
-            var id = await _createProductHandler.Handle(new CreateProductCommand(
+            var id = await _sender.Send(new CreateProductCommand(
                 Name: $"{faker.Commerce.ProductName()} {Guid.NewGuid().ToString("N")[..6].ToUpper()}",
                 SKU: $"{faker.PickRandom(Categories)}-{Guid.NewGuid().ToString("N")[..8].ToUpper()}",
                 ImageUrl: faker.Image.PicsumUrl(640, 480),
@@ -64,7 +52,7 @@ public class SeedService : ISeedService
             var itemCount = faker.Random.Int(1, Math.Min(3, productIds.Count));
             var selectedProducts = faker.PickRandom(productIds, itemCount).Distinct().ToList();
 
-            var orderId = await _placeOrderHandler.Handle(new PlaceOrderCommand(
+            var orderId = await _sender.Send(new PlaceOrderCommand(
                 CustomerId: faker.PickRandom(customerIds),
                 Items: selectedProducts.Select(p => new OrderItemRequest(
                     ProductId: p,
@@ -75,12 +63,12 @@ public class SeedService : ISeedService
             var roll = faker.Random.Int(1, 100);
             if (roll <= 60)
             {
-                await _completeOrderHandler.Handle(new CompleteOrderCommand(orderId));
+                await _sender.Send(new CompleteOrderCommand(orderId));
                 statusEvents++;
             }
             else if (roll <= 80)
             {
-                await _cancelOrderHandler.Handle(new CancelOrderCommand(orderId));
+                await _sender.Send(new CancelOrderCommand(orderId));
                 statusEvents++;
             }
         }

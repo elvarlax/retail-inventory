@@ -1,3 +1,4 @@
+using MediatR;
 using RetailInventory.Application.Common.Exceptions;
 using RetailInventory.Application.Interfaces;
 using RetailInventory.Application.Orders.Events;
@@ -7,7 +8,7 @@ using System.Text.Json;
 
 namespace RetailInventory.Application.Orders.Commands;
 
-public class CancelOrderHandler
+public class CancelOrderHandler : IRequestHandler<CancelOrderCommand>
 {
     private readonly IOrderRepository _orderRepository;
     private readonly IProductRepository _productRepository;
@@ -23,9 +24,9 @@ public class CancelOrderHandler
         _outboxRepository = outboxRepository;
     }
 
-    public async Task Handle(CancelOrderCommand command)
+    public async Task Handle(CancelOrderCommand command, CancellationToken ct)
     {
-        var order = await _orderRepository.GetByIdAsync(command.OrderId)
+        var order = await _orderRepository.GetByIdAsync(command.OrderId, ct)
             ?? throw new NotFoundException("Order not found.");
 
         if (command.RequestingCustomerId.HasValue && order.CustomerId != command.RequestingCustomerId.Value)
@@ -35,7 +36,7 @@ public class CancelOrderHandler
             throw new BadRequestException("Only pending orders can be cancelled.");
 
         var productIds = order.OrderItems.Select(i => i.ProductId).Distinct();
-        var products = await _productRepository.GetByIdsAsync(productIds);
+        var products = await _productRepository.GetByIdsAsync(productIds, ct);
         var productMap = products.ToDictionary(p => p.Id);
 
         foreach (var item in order.OrderItems)
@@ -65,6 +66,6 @@ public class CancelOrderHandler
             OccurredAtUtc: occurredAt
         ));
 
-        await _orderRepository.SaveChangesAsync();
+        await _orderRepository.SaveChangesAsync(ct);
     }
 }

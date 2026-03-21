@@ -1,9 +1,10 @@
+using MediatR;
 using RetailInventory.Application.Common.Exceptions;
 using RetailInventory.Application.Interfaces;
 
 namespace RetailInventory.Application.Customers.Commands;
 
-public class UpdateCustomerHandler
+public class UpdateCustomerHandler : IRequestHandler<UpdateCustomerCommand>
 {
     private readonly ICustomerRepository _repository;
 
@@ -12,12 +13,12 @@ public class UpdateCustomerHandler
         _repository = repository;
     }
 
-    public async Task Handle(UpdateCustomerCommand command)
+    public async Task Handle(UpdateCustomerCommand command, CancellationToken ct)
     {
-        var customer = await _repository.GetByIdAsync(command.Id)
+        var customer = await _repository.GetByIdAsync(command.Id, ct)
             ?? throw new NotFoundException("Customer not found.");
 
-        var emailConflict = await _repository.GetByEmailAsync(command.Email);
+        var emailConflict = await _repository.GetByEmailAsync(command.Email, ct);
         if (emailConflict != null && emailConflict.Id != command.Id)
             throw new ConflictException($"Email '{command.Email}' is already in use.");
 
@@ -25,6 +26,6 @@ public class UpdateCustomerHandler
         customer.LastName = command.LastName;
         customer.Email = command.Email;
 
-        await _repository.SaveChangesAsync();
+        await _repository.SaveChangesAsync(ct);
     }
 }

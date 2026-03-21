@@ -1,4 +1,5 @@
 using AutoMapper;
+using MediatR;
 using RetailInventory.Application.Common.Exceptions;
 using RetailInventory.Application.Customers.Events;
 using RetailInventory.Application.Interfaces;
@@ -8,7 +9,7 @@ using System.Text.Json;
 
 namespace RetailInventory.Application.Customers.Commands;
 
-public class CreateCustomerHandler
+public class CreateCustomerHandler : IRequestHandler<CreateCustomerCommand, Customer>
 {
     private readonly ICustomerRepository _customerRepository;
     private readonly IOutboxRepository _outboxRepository;
@@ -21,16 +22,16 @@ public class CreateCustomerHandler
         _mapper = mapper;
     }
 
-    public async Task<Customer> Handle(CreateCustomerCommand command)
+    public async Task<Customer> Handle(CreateCustomerCommand command, CancellationToken ct)
     {
-        var existing = await _customerRepository.GetByEmailAsync(command.Email);
+        var existing = await _customerRepository.GetByEmailAsync(command.Email, ct);
         if (existing != null)
             throw new ConflictException($"Email '{command.Email}' is already in use.");
 
         var customer = _mapper.Map<Customer>(command);
         customer.Id = Guid.NewGuid();
 
-        await _customerRepository.AddAsync(customer);
+        await _customerRepository.AddAsync(customer, ct);
 
         var occurredAt = DateTime.UtcNow;
 
@@ -52,7 +53,7 @@ public class CreateCustomerHandler
             OccurredAtUtc: occurredAt
         ));
 
-        await _customerRepository.SaveChangesAsync();
+        await _customerRepository.SaveChangesAsync(ct);
 
         return customer;
     }

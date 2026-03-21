@@ -1,9 +1,9 @@
 using AutoMapper;
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RetailInventory.Api.DTOs;
-using RetailInventory.Application.Authentication;
-using RetailInventory.Application.Authentication.DTOs;
+using RetailInventory.Application.Authentication.Commands;
 
 namespace RetailInventory.Api.Controllers;
 
@@ -11,23 +11,21 @@ namespace RetailInventory.Api.Controllers;
 [Route("auth")]
 public class AuthenticationController : ControllerBase
 {
-    private readonly LoginHandler _loginHandler;
-    private readonly RegisterHandler _registerHandler;
+    private readonly ISender _sender;
     private readonly IMapper _mapper;
 
-    public AuthenticationController(LoginHandler loginHandler, RegisterHandler registerHandler, IMapper mapper)
+    public AuthenticationController(ISender sender, IMapper mapper)
     {
-        _loginHandler = loginHandler;
-        _registerHandler = registerHandler;
+        _sender = sender;
         _mapper = mapper;
     }
 
     [AllowAnonymous]
     [HttpPost("login")]
-    public async Task<IActionResult> Login([FromBody] LoginRequestDto request)
+    public async Task<IActionResult> Login([FromBody] LoginRequestDto request, CancellationToken ct)
     {
         var command = _mapper.Map<LoginCommand>(request);
-        var response = await _loginHandler.Handle(command);
+        var response = await _sender.Send(command, ct);
 
         if (response == null)
             return Unauthorized(new { message = "Invalid credentials" });
@@ -37,10 +35,10 @@ public class AuthenticationController : ControllerBase
 
     [AllowAnonymous]
     [HttpPost("register")]
-    public async Task<IActionResult> Register([FromBody] RegisterRequestDto request)
+    public async Task<IActionResult> Register([FromBody] RegisterRequestDto request, CancellationToken ct)
     {
         var command = _mapper.Map<RegisterCommand>(request);
-        var response = await _registerHandler.Handle(command);
+        var response = await _sender.Send(command, ct);
 
         return Ok(response);
     }

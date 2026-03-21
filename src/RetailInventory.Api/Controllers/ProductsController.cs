@@ -1,4 +1,5 @@
 using Asp.Versioning;
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RetailInventory.Api.DTOs;
@@ -13,32 +14,16 @@ namespace RetailInventory.Api.Controllers;
 [Route("api/v{version:apiVersion}/[controller]")]
 public class ProductsController : ControllerBase
 {
-    private readonly CreateProductHandler _createProductHandler;
-    private readonly GetProductsHandler _getProductsHandler;
-    private readonly GetProductByIdHandler _getProductByIdHandler;
-    private readonly UpdateProductHandler _updateProductHandler;
-    private readonly RestockProductHandler _restockProductHandler;
-    private readonly DeleteProductHandler _deleteProductHandler;
+    private readonly ISender _sender;
 
-    public ProductsController(
-        CreateProductHandler createProductHandler,
-        GetProductsHandler getProductsHandler,
-        GetProductByIdHandler getProductByIdHandler,
-        UpdateProductHandler updateProductHandler,
-        RestockProductHandler restockProductHandler,
-        DeleteProductHandler deleteProductHandler)
+    public ProductsController(ISender sender)
     {
-        _createProductHandler = createProductHandler;
-        _getProductsHandler = getProductsHandler;
-        _getProductByIdHandler = getProductByIdHandler;
-        _updateProductHandler = updateProductHandler;
-        _restockProductHandler = restockProductHandler;
-        _deleteProductHandler = deleteProductHandler;
+        _sender = sender;
     }
 
     [Authorize(Roles = "Admin")]
     [HttpPost]
-    public async Task<IActionResult> Create(CreateProductRequest request)
+    public async Task<IActionResult> Create(CreateProductRequest request, CancellationToken ct)
     {
         var command = new CreateProductCommand(
             request.Name,
@@ -47,7 +32,7 @@ public class ProductsController : ControllerBase
             request.Price,
             request.StockQuantity);
 
-        var id = await _createProductHandler.Handle(command);
+        var id = await _sender.Send(command, ct);
 
         return CreatedAtAction(nameof(GetById), new { id }, null);
     }
@@ -58,18 +43,18 @@ public class ProductsController : ControllerBase
         [FromQuery] int pageSize = 10,
         [FromQuery] string? sortBy = null,
         [FromQuery] string? sortDirection = "asc",
-        [FromQuery] string? search = null)
+        [FromQuery] string? search = null,
+        CancellationToken ct = default)
     {
         var query = new GetProductsQuery(pageNumber, pageSize, sortBy, sortDirection, search);
-        var result = await _getProductsHandler.Handle(query);
+        var result = await _sender.Send(query, ct);
         return Ok(result);
     }
 
     [HttpGet("{id}")]
-    public async Task<IActionResult> GetById(Guid id)
+    public async Task<IActionResult> GetById(Guid id, CancellationToken ct)
     {
-        var query = new GetProductByIdQuery(id);
-        var product = await _getProductByIdHandler.Handle(query);
+        var product = await _sender.Send(new GetProductByIdQuery(id), ct);
 
         if (product == null)
             return NotFound();
@@ -79,26 +64,26 @@ public class ProductsController : ControllerBase
 
     [Authorize(Roles = "Admin")]
     [HttpPut("{id}")]
-    public async Task<IActionResult> Update(Guid id, UpdateProductRequest request)
+    public async Task<IActionResult> Update(Guid id, UpdateProductRequest request, CancellationToken ct)
     {
-        await _updateProductHandler.Handle(new UpdateProductCommand(
-            id, request.Name, request.SKU, request.ImageUrl, request.Price, request.StockQuantity));
+        await _sender.Send(new UpdateProductCommand(
+            id, request.Name, request.SKU, request.ImageUrl, request.Price, request.StockQuantity), ct);
         return NoContent();
     }
 
     [Authorize(Roles = "Admin")]
     [HttpPost("{id}/restock")]
-    public async Task<IActionResult> Restock(Guid id, RestockProductRequest request)
+    public async Task<IActionResult> Restock(Guid id, RestockProductRequest request, CancellationToken ct)
     {
-        await _restockProductHandler.Handle(new RestockProductCommand(id, request.Quantity));
+        await _sender.Send(new RestockProductCommand(id, request.Quantity), ct);
         return NoContent();
     }
 
     [Authorize(Roles = "Admin")]
     [HttpDelete("{id}")]
-    public async Task<IActionResult> Delete(Guid id)
+    public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
-        await _deleteProductHandler.Handle(new DeleteProductCommand(id));
+        await _sender.Send(new DeleteProductCommand(id), ct);
         return NoContent();
     }
 }

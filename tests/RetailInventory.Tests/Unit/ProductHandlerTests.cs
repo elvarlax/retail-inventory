@@ -1,6 +1,7 @@
 using AutoMapper;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using RetailInventory.Application.Interfaces;
 using RetailInventory.Application.Mappings;
 using RetailInventory.Application.Outbox;
@@ -23,7 +24,11 @@ public class ProductHandlerTests
     }
 
     private static IMapper CreateMapper() =>
-        new MapperConfiguration(cfg => cfg.AddProfile<ApplicationMappingProfile>()).CreateMapper();
+        new ServiceCollection()
+            .AddLogging()
+            .AddAutoMapper(cfg => cfg.AddProfile<ApplicationMappingProfile>())
+            .BuildServiceProvider()
+            .GetRequiredService<IMapper>();
 
     private static CreateProductHandler CreateHandler(RetailInventory.Infrastructure.Data.RetailDbContext db) =>
         new(new ProductRepository(db), new FakeOutboxRepository(), CreateMapper());
@@ -51,7 +56,7 @@ public class ProductHandlerTests
         var handler = CreateHandler(db);
 
         // Act
-        var id = await handler.Handle(new CreateProductCommand("Phone", "ELEC-001", null, 299.99m, 50));
+        var id = await handler.Handle(new CreateProductCommand("Phone", "ELEC-001", null, 299.99m, 50), CancellationToken.None);
 
         // Assert
         var product = await db.Products.FindAsync(id);
@@ -74,7 +79,7 @@ public class ProductHandlerTests
         var handler = new CreateProductHandler(new ProductRepository(db), fakeOutbox, CreateMapper());
 
         // Act
-        await handler.Handle(new CreateProductCommand("Phone", "ELEC-001", null, 299.99m, 50));
+        await handler.Handle(new CreateProductCommand("Phone", "ELEC-001", null, 299.99m, 50), CancellationToken.None);
 
         // Assert
         captured.Should().NotBeNull();
@@ -95,7 +100,7 @@ public class ProductHandlerTests
         var handler = new GetProductByIdHandler(new EfProductQueryRepository(db));
 
         // Act
-        var result = await handler.Handle(new GetProductByIdQuery(Guid.NewGuid()));
+        var result = await handler.Handle(new GetProductByIdQuery(Guid.NewGuid()), CancellationToken.None);
 
         // Assert
         result.Should().BeNull();
@@ -115,7 +120,7 @@ public class ProductHandlerTests
         var handler = new GetProductByIdHandler(new EfProductQueryRepository(db));
 
         // Act
-        var result = await handler.Handle(new GetProductByIdQuery(product.Id));
+        var result = await handler.Handle(new GetProductByIdQuery(product.Id), CancellationToken.None);
 
         // Assert
         result.Should().NotBeNull();
@@ -145,7 +150,7 @@ public class ProductHandlerTests
         var handler = new GetProductsHandler(new EfProductQueryRepository(db));
 
         // Act
-        var result = await handler.Handle(new GetProductsQuery(PageNumber: 2, PageSize: 5, SortBy: null, SortDirection: null));
+        var result = await handler.Handle(new GetProductsQuery(PageNumber: 2, PageSize: 5, SortBy: null, SortDirection: null), CancellationToken.None);
 
         // Assert
         result.Items.Should().HaveCount(5);
@@ -171,7 +176,7 @@ public class ProductHandlerTests
         var handler = new GetProductsHandler(new EfProductQueryRepository(db));
 
         // Act
-        var result = await handler.Handle(new GetProductsQuery(1, 10, "price", "desc"));
+        var result = await handler.Handle(new GetProductsQuery(1, 10, "price", "desc"), CancellationToken.None);
 
         // Assert
         result.Items.Should().HaveCount(3);
@@ -197,7 +202,7 @@ public class ProductHandlerTests
         var handler = new GetProductsHandler(new EfProductQueryRepository(db));
 
         // Act
-        var result = await handler.Handle(new GetProductsQuery(1, 10, "stockquantity", "asc"));
+        var result = await handler.Handle(new GetProductsQuery(1, 10, "stockquantity", "asc"), CancellationToken.None);
 
         // Assert
         result.Items.Should().HaveCount(3);

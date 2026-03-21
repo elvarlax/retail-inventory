@@ -1,6 +1,6 @@
 using AutoMapper;
 using RetailInventory.Api.DTOs;
-using RetailInventory.Application.Authentication;
+using RetailInventory.Application.Authentication.Commands;
 
 namespace RetailInventory.Api.Mappings;
 

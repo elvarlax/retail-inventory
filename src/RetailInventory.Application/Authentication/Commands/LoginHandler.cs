@@ -1,9 +1,10 @@
+using MediatR;
 using RetailInventory.Application.Authentication.DTOs;
 using RetailInventory.Application.Interfaces;
 
-namespace RetailInventory.Application.Authentication;
+namespace RetailInventory.Application.Authentication.Commands;
 
-public class LoginHandler
+public class LoginHandler : IRequestHandler<LoginCommand, AuthResponseDto?>
 {
     private readonly IUserRepository _userRepository;
     private readonly ICustomerRepository _customerRepository;
@@ -22,15 +23,15 @@ public class LoginHandler
         _tokenService = tokenService;
     }
 
-    public async Task<AuthResponseDto?> Handle(LoginCommand command)
+    public async Task<AuthResponseDto?> Handle(LoginCommand command, CancellationToken ct)
     {
-        var user = await _userRepository.GetByEmailAsync(command.Email);
+        var user = await _userRepository.GetByEmailAsync(command.Email, ct);
         if (user == null) return null;
 
         if (!_passwordHasher.Verify(command.Password, user.PasswordHash))
             return null;
 
-        var customer = await _customerRepository.GetByEmailAsync(command.Email);
+        var customer = await _customerRepository.GetByEmailAsync(command.Email, ct);
 
         return new AuthResponseDto
         {

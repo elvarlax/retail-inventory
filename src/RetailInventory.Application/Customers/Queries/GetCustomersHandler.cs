@@ -1,10 +1,11 @@
+using MediatR;
 using RetailInventory.Application.Common.DTOs;
 using RetailInventory.Application.Customers.DTOs;
 using RetailInventory.Application.Interfaces;
 
 namespace RetailInventory.Application.Customers.Queries;
 
-public class GetCustomersHandler
+public class GetCustomersHandler : IRequestHandler<GetCustomersQuery, PagedResultDto<CustomerDto>>
 {
     private readonly ICustomerQueryRepository _queryRepository;
 
@@ -13,7 +14,7 @@ public class GetCustomersHandler
         _queryRepository = queryRepository;
     }
 
-    public async Task<PagedResultDto<CustomerDto>> Handle(GetCustomersQuery query)
+    public async Task<PagedResultDto<CustomerDto>> Handle(GetCustomersQuery query, CancellationToken ct)
     {
         var pageNumber = query.PageNumber <= 0 ? 1 : query.PageNumber;
         var pageSize = query.PageSize <= 0 || query.PageSize > 50 ? 10 : query.PageSize;

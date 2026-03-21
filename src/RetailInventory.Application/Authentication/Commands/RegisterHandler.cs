@@ -1,3 +1,4 @@
+using MediatR;
 using RetailInventory.Application.Authentication.DTOs;
 using RetailInventory.Application.Common.Exceptions;
 using RetailInventory.Application.Customers.Events;
@@ -6,9 +7,9 @@ using RetailInventory.Application.Outbox;
 using RetailInventory.Domain;
 using System.Text.Json;
 
-namespace RetailInventory.Application.Authentication;
+namespace RetailInventory.Application.Authentication.Commands;
 
-public class RegisterHandler
+public class RegisterHandler : IRequestHandler<RegisterCommand, AuthResponseDto>
 {
     private readonly IUserRepository _userRepository;
     private readonly ICustomerRepository _customerRepository;
@@ -30,9 +31,9 @@ public class RegisterHandler
         _tokenService = tokenService;
     }
 
-    public async Task<AuthResponseDto> Handle(RegisterCommand command)
+    public async Task<AuthResponseDto> Handle(RegisterCommand command, CancellationToken ct)
     {
-        if (await _userRepository.ExistsAsync(command.Email))
+        if (await _userRepository.ExistsAsync(command.Email, ct))
             throw new ConflictException("Email already in use.");
 
         var customer = new Customer
@@ -62,8 +63,8 @@ public class RegisterHandler
             Email = customer.Email
         };
 
-        await _customerRepository.AddAsync(customer);
-        await _userRepository.AddAsync(user);
+        await _customerRepository.AddAsync(customer, ct);
+        await _userRepository.AddAsync(user, ct);
         await _outboxRepository.AddAsync(new OutboxEntry(
             Id: @event.EventId,
             Type: nameof(CustomerCreatedV1),
@@ -74,7 +75,7 @@ public class RegisterHandler
 
         // Single SaveChangesAsync commits customer, user, and outbox atomically.
         // All three repositories share the same DbContext instance (scoped DI).
-        await _userRepository.SaveChangesAsync();
+        await _userRepository.SaveChangesAsync(ct);
 
         return new AuthResponseDto
         {

@@ -79,7 +79,7 @@ public class OrderHandlerTests
             ]);
 
         // Act
-        var orderId = await handler.Handle(command);
+        var orderId = await handler.Handle(command, CancellationToken.None);
 
         // Assert
         var order = await db.Orders.Include(o => o.OrderItems)
@@ -112,7 +112,7 @@ public class OrderHandlerTests
             Items: [new OrderItemRequest(product.Id, 5)]);
 
         // Act
-        var act = async () => await handler.Handle(command);
+        var act = async () => await handler.Handle(command, CancellationToken.None);
 
         // Assert
         await act.Should().ThrowAsync<Exception>()
@@ -138,10 +138,10 @@ public class OrderHandlerTests
         await db.SaveChangesAsync();
 
         var orderId = await CreatePlaceHandler(db).Handle(new PlaceOrderCommand(
-            customer.Id, [new OrderItemRequest(product.Id, 1)]));
+            customer.Id, [new OrderItemRequest(product.Id, 1)]), CancellationToken.None);
 
         // Act
-        await CreateCompleteHandler(db).Handle(new CompleteOrderCommand(orderId));
+        await CreateCompleteHandler(db).Handle(new CompleteOrderCommand(orderId), CancellationToken.None);
 
         // Assert
         var order = await db.Orders.FirstAsync(o => o.Id == orderId);
@@ -164,10 +164,10 @@ public class OrderHandlerTests
         await db.SaveChangesAsync();
 
         var orderId = await CreatePlaceHandler(db).Handle(new PlaceOrderCommand(
-            customer.Id, [new OrderItemRequest(product.Id, 3)]));
+            customer.Id, [new OrderItemRequest(product.Id, 3)]), CancellationToken.None);
 
         // Act
-        await CreateCancelHandler(db).Handle(new CancelOrderCommand(orderId));
+        await CreateCancelHandler(db).Handle(new CancelOrderCommand(orderId), CancellationToken.None);
 
         // Assert
         var order = await db.Orders.FirstAsync(o => o.Id == orderId);
